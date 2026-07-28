@@ -1,0 +1,217 @@
+/* VSCode Zhihu - Compact Minimal Popup Styling */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 295px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: #1e1e1e;
+  color: #cccccc;
+  font-size: 12px;
+  user-select: none;
+}
+
+.popup-container {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.logo .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.pro-tag {
+  background: #333333;
+  color: #888888;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid #444444;
+}
+
+.pro-tag.active {
+  background: linear-gradient(135deg, #ffb300, #ff8c00);
+  color: #111111;
+  border: none;
+}
+
+/* Content rows */
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.setting-row .label {
+  font-size: 12px;
+  color: #cccccc;
+}
+
+.text-input {
+  background-color: #252526;
+  color: #ffffff;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  outline: none;
+}
+
+.text-input:focus {
+  border-color: #007acc;
+}
+
+.select-input {
+  background-color: #252526;
+  color: #cccccc;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 11px;
+  outline: none;
+  cursor: pointer;
+  max-width: 170px;
+}
+
+.select-input:focus {
+  border-color: #007acc;
+}
+
+.btn {
+  background-color: #0e639c;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 9px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.btn:hover {
+  background-color: #1177bb;
+}
+
+.btn-secondary {
+  background-color: #2d2d2d;
+  color: #cccccc;
+  border: 1px solid #3c3c3c;
+}
+
+.btn-secondary:hover {
+  background-color: #383838;
+}
+
+/* Switch Toggle */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 17px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #3c3c3c;
+  transition: .2s;
+  border-radius: 17px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 11px;
+  width: 11px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #0e639c;
+}
+
+input:checked + .slider:before {
+  transform: translateX(17px);
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid #2d2d2d;
+  font-size: 11px;
+  color: #777777;
+}
+
+.sponsor-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sponsor-link {
+  color: #007acc;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.sponsor-link:hover {
+  color: #3794ff;
+  text-decoration: underline;
+}
+
+.dot {
+  color: #444444;
+}
+
+.version {
+  color: #555555;
+  font-size: 10px;
+}

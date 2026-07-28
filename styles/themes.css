@@ -1,0 +1,290 @@
+/* VSCode Zhihu - Theme Definitions */
+
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600&display=swap');
+
+/* ==========================================================================
+   1. VS Code Dark+ (Default)
+   ========================================================================== */
+:root, [data-vsc-theme="dark-plus"] {
+  --vsc-bg-activity: #333333;
+  --vsc-bg-sidebar: #252526;
+  --vsc-bg-editor: #1e1e1e;
+  --vsc-bg-editor-gutter: #1e1e1e;
+  --vsc-bg-tab-active: #1e1e1e;
+  --vsc-bg-tab-inactive: #2d2d2d;
+  --vsc-bg-tab-hover: #1e1e1e;
+  --vsc-bg-statusbar: #007acc;
+  --vsc-bg-input: #3c3c3c;
+  --vsc-bg-hover: #2a2d2e;
+  --vsc-bg-selection: #264f78;
+  --vsc-bg-palette: #252526;
+  --vsc-border: #3c3c3c;
+  --vsc-border-active: #007acc;
+
+  --vsc-fg: #d4d4d4;
+  --vsc-fg-muted: #858585;
+  --vsc-fg-statusbar: #ffffff;
+  --vsc-line-number: #858585;
+
+  /* Syntax Highlighting */
+  --vsc-syn-keyword: #569cd6;
+  --vsc-syn-control: #c586c0;
+  --vsc-syn-string: #ce9178;
+  --vsc-syn-comment: #6a9955;
+  --vsc-syn-type: #4ec9b0;
+  --vsc-syn-function: #dcdcaa;
+  --vsc-syn-number: #b5cea8;
+  --vsc-syn-variable: #9cdcfe;
+  --vsc-syn-tag: #569cd6;
+  --vsc-syn-punctuation: #d4d4d4;
+
+  --vsc-accent: #007acc;
+  --vsc-accent-hover: #0062a3;
+  --vsc-shadow: rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   2. Tokyo Night
+   ========================================================================== */
+[data-vsc-theme="tokyo-night"] {
+  --vsc-bg-activity: #16161e;
+  --vsc-bg-sidebar: #1a1b26;
+  --vsc-bg-editor: #1a1b26;
+  --vsc-bg-editor-gutter: #1a1b26;
+  --vsc-bg-tab-active: #1a1b26;
+  --vsc-bg-tab-inactive: #16161e;
+  --vsc-bg-tab-hover: #24283b;
+  --vsc-bg-statusbar: #7aa2f7;
+  --vsc-bg-input: #24283b;
+  --vsc-bg-hover: #24283b;
+  --vsc-bg-selection: #283457;
+  --vsc-bg-palette: #1a1b26;
+  --vsc-border: #232433;
+  --vsc-border-active: #7aa2f7;
+
+  --vsc-fg: #a9b1d6;
+  --vsc-fg-muted: #565f89;
+  --vsc-fg-statusbar: #15161e;
+  --vsc-line-number: #444b6a;
+
+  /* Syntax Highlighting */
+  --vsc-syn-keyword: #bb9af7;
+  --vsc-syn-control: #9d7cd8;
+  --vsc-syn-string: #9ece6a;
+  --vsc-syn-comment: #565f89;
+  --vsc-syn-type: #2ac3de;
+  --vsc-syn-function: #7aa2f7;
+  --vsc-syn-number: #ff9e64;
+  --vsc-syn-variable: #e0af68;
+  --vsc-syn-tag: #f7768e;
+  --vsc-syn-punctuation: #a9b1d6;
+
+  --vsc-accent: #7aa2f7;
+  --vsc-accent-hover: #5d89e2;
+  --vsc-shadow: rgba(0, 0, 0, 0.5);
+}
+
+/* ==========================================================================
+   3. Cyberpunk Neon
+   ========================================================================== */
+[data-vsc-theme="cyberpunk"] {
+  --vsc-bg-activity: #120e24;
+  --vsc-bg-sidebar: #181332;
+  --vsc-bg-editor: #120e24;
+  --vsc-bg-editor-gutter: #120e24;
+  --vsc-bg-tab-active: #120e24;
+  --vsc-bg-tab-inactive: #181332;
+  --vsc-bg-tab-hover: #221c44;
+  --vsc-bg-statusbar: #ff0055;
+  --vsc-bg-input: #261f49;
+  --vsc-bg-hover: #2a2252;
+  --vsc-bg-selection: #3d2d77;
+  --vsc-bg-palette: #181332;
+  --vsc-border: #352968;
+  --vsc-border-active: #00ffcc;
+
+  --vsc-fg: #f5e0ff;
+  --vsc-fg-muted: #8467ab;
+  --vsc-fg-statusbar: #ffffff;
+  --vsc-line-number: #6d5093;
+
+  /* Syntax Highlighting */
+  --vsc-syn-keyword: #ff0055;
+  --vsc-syn-control: #e400ff;
+  --vsc-syn-string: #ffee00;
+  --vsc-syn-comment: #00ffcc;
+  --vsc-syn-type: #00ffcc;
+  --vsc-syn-function: #00b8ff;
+  --vsc-syn-number: #ff7700;
+  --vsc-syn-variable: #f5e0ff;
+  --vsc-syn-tag: #ff0055;
+  --vsc-syn-punctuation: #ffffff;
+
+  --vsc-accent: #00ffcc;
+  --vsc-accent-hover: #00cc99;
+  --vsc-shadow: rgba(255, 0, 85, 0.25);
+}
+
+/* ==========================================================================
+   4. One Dark Pro
+   ========================================================================== */
+[data-vsc-theme="one-dark"] {
+  --vsc-bg-activity: #21252b;
+  --vsc-bg-sidebar: #21252b;
+  --vsc-bg-editor: #282c34;
+  --vsc-bg-editor-gutter: #282c34;
+  --vsc-bg-tab-active: #282c34;
+  --vsc-bg-tab-inactive: #21252b;
+  --vsc-bg-tab-hover: #2c313a;
+  --vsc-bg-statusbar: #21252b;
+  --vsc-bg-input: #1b1d23;
+  --vsc-bg-hover: #2c313a;
+  --vsc-bg-selection: #3e4451;
+  --vsc-bg-palette: #21252b;
+  --vsc-border: #181a1f;
+  --vsc-border-active: #61afef;
+
+  --vsc-fg: #abb2bf;
+  --vsc-fg-muted: #5c6370;
+  --vsc-fg-statusbar: #9da5b4;
+  --vsc-line-number: #4b5263;
+
+  /* Syntax Highlighting */
+  --vsc-syn-keyword: #c678dd;
+  --vsc-syn-control: #c678dd;
+  --vsc-syn-string: #98c379;
+  --vsc-syn-comment: #5c6370;
+  --vsc-syn-type: #e5c07b;
+  --vsc-syn-function: #61afef;
+  --vsc-syn-number: #d19a66;
+  --vsc-syn-variable: #e06c75;
+  --vsc-syn-tag: #e06c75;
+  --vsc-syn-punctuation: #abb2bf;
+
+  --vsc-accent: #61afef;
+  --vsc-accent-hover: #4fa0e3;
+  --vsc-shadow: rgba(0, 0, 0, 0.5);
+}
+
+/* ==========================================================================
+   5. Monokai
+   ========================================================================== */
+[data-vsc-theme="monokai"] {
+  --vsc-bg-activity: #1e1f1c;
+  --vsc-bg-sidebar: #1e1f1c;
+  --vsc-bg-editor: #272822;
+  --vsc-bg-editor-gutter: #272822;
+  --vsc-bg-tab-active: #272822;
+  --vsc-bg-tab-inactive: #1e1f1c;
+  --vsc-bg-tab-hover: #3e3d32;
+  --vsc-bg-statusbar: #75715e;
+  --vsc-bg-input: #414339;
+  --vsc-bg-hover: #3e3d32;
+  --vsc-bg-selection: #49483e;
+  --vsc-bg-palette: #1e1f1c;
+  --vsc-border: #141512;
+  --vsc-border-active: #f92672;
+
+  --vsc-fg: #f8f8f2;
+  --vsc-fg-muted: #75715e;
+  --vsc-fg-statusbar: #f8f8f2;
+  --vsc-line-number: #75715e;
+
+  /* Syntax Highlighting */
+  --vsc-syn-keyword: #f92672;
+  --vsc-syn-control: #f92672;
+  --vsc-syn-string: #e6db74;
+  --vsc-syn-comment: #75715e;
+  --vsc-syn-type: #66d9ef;
+  --vsc-syn-function: #a6e22e;
+  --vsc-syn-number: #ae81ff;
+  --vsc-syn-variable: #fd971f;
+  --vsc-syn-tag: #f92672;
+  --vsc-syn-punctuation: #f8f8f2;
+
+  --vsc-accent: #a6e22e;
+  --vsc-accent-hover: #92cd21;
+  --vsc-shadow: rgba(0, 0, 0, 0.5);
+}
+
+/* ==========================================================================
+   6. Solarized Dark
+   ========================================================================== */
+[data-vsc-theme="solarized-dark"] {
+  --vsc-bg-activity: #001e26;
+  --vsc-bg-sidebar: #002b36;
+  --vsc-bg-editor: #002b36;
+  --vsc-bg-editor-gutter: #002b36;
+  --vsc-bg-tab-active: #002b36;
+  --vsc-bg-tab-inactive: #001e26;
+  --vsc-bg-tab-hover: #073642;
+  --vsc-bg-statusbar: #2aa198;
+  --vsc-bg-input: #073642;
+  --vsc-bg-hover: #073642;
+  --vsc-bg-selection: #073642;
+  --vsc-bg-palette: #002b36;
+  --vsc-border: #073642;
+  --vsc-border-active: #268bd2;
+
+  --vsc-fg: #839496;
+  --vsc-fg-muted: #586e75;
+  --vsc-fg-statusbar: #ffffff;
+  --vsc-line-number: #586e75;
+
+  /* Syntax Highlighting */
+  --vsc-syn-keyword: #859900;
+  --vsc-syn-control: #dc322f;
+  --vsc-syn-string: #2aa198;
+  --vsc-syn-comment: #586e75;
+  --vsc-syn-type: #b58900;
+  --vsc-syn-function: #268bd2;
+  --vsc-syn-number: #d33682;
+  --vsc-syn-variable: #cb4b16;
+  --vsc-syn-tag: #268bd2;
+  --vsc-syn-punctuation: #839496;
+
+  --vsc-accent: #268bd2;
+  --vsc-accent-hover: #1e70a9;
+  --vsc-shadow: rgba(0, 0, 0, 0.4);
+}
+
+/* ==========================================================================
+   7. Light Modern
+   ========================================================================== */
+[data-vsc-theme="light-modern"] {
+  --vsc-bg-activity: #2c2c2c;
+  --vsc-bg-sidebar: #f3f3f3;
+  --vsc-bg-editor: #ffffff;
+  --vsc-bg-editor-gutter: #ffffff;
+  --vsc-bg-tab-active: #ffffff;
+  --vsc-bg-tab-inactive: #ececec;
+  --vsc-bg-tab-hover: #ffffff;
+  --vsc-bg-statusbar: #007acc;
+  --vsc-bg-input: #ffffff;
+  --vsc-bg-hover: #e8e8e8;
+  --vsc-bg-selection: #add6ff;
+  --vsc-bg-palette: #f3f3f3;
+  --vsc-border: #e5e5e5;
+  --vsc-border-active: #007acc;
+
+  --vsc-fg: #24292e;
+  --vsc-fg-muted: #6a737d;
+  --vsc-fg-statusbar: #ffffff;
+  --vsc-line-number: #959da5;
+
+  /* Syntax Highlighting */
+  --vsc-syn-keyword: #005cc5;
+  --vsc-syn-control: #d73a49;
+  --vsc-syn-string: #032f62;
+  --vsc-syn-comment: #6a737d;
+  --vsc-syn-type: #6f42c1;
+  --vsc-syn-function: #6f42c1;
+  --vsc-syn-number: #005cc5;
+  --vsc-syn-variable: #e36209;
+  --vsc-syn-tag: #22863a;
+  --vsc-syn-punctuation: #24292e;
+
+  --vsc-accent: #007acc;
+  --vsc-accent-hover: #005999;
+  --vsc-shadow: rgba(0, 0, 0, 0.15);
+}

@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "VSCode Zhihu (知乎 VS Code 皮肤)",
+  "version": "1.0.0",
+  "description": "把知乎转换为现代化的 VS Code 编辑器界面，支持代码格式化浏览、分类文件树、多标签页、摸鱼老板键及命令面板。",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.zhihu.com/*"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "VSCode Zhihu 设置",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.zhihu.com/*"
+      ],
+      "css": [
+        "styles/themes.css",
+        "styles/vscode.css"
+      ],
+      "js": [
+        "scripts/parser.js",
+        "scripts/command-palette.js",
+        "scripts/vscode-ui.js",
+        "content.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "styles/*",
+        "icons/*"
+      ],
+      "matches": [
+        "https://*.zhihu.com/*"
+      ]
+    }
+  ]
+}

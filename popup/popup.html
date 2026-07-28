@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>VSCode Zhihu Settings</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">
+        <svg class="icon" viewBox="0 0 24 24"><path fill="#007acc" d="M17.5 0h-9L7 1.5V3H4.5L3 4.5v15L4.5 21h12l1.5-1.5V18h3l1.5-1.5v-15L21 0h-3.5zM16 19.5H4.5v-15H7V15l1.5 1.5h7.5v3zm4.5-3H9V1.5h8.5V6H21.5v10.5z"/></svg>
+        <span>VSCode Zhihu</span>
+      </div>
+      <label class="switch" title="开启/关闭 VS Code 视图">
+        <input type="checkbox" id="toggle-enabled" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="content">
+      <!-- Theme Selection -->
+      <div class="setting-row">
+        <span class="label">配色主题</span>
+        <select id="select-theme" class="select-input">
+          <option value="dark-plus">VS Code Dark+ (默认)</option>
+          <option value="tokyo-night">Tokyo Night</option>
+          <option value="cyberpunk">Cyberpunk Neon</option>
+          <option value="one-dark">One Dark Pro</option>
+          <option value="monokai">Monokai</option>
+          <option value="solarized-dark">Solarized Dark</option>
+          <option value="light-modern">Light Modern</option>
+        </select>
+      </div>
+
+      <!-- Boss Key Test Button -->
+      <div class="setting-row">
+        <span class="label">摸鱼老板键 (Alt+V)</span>
+        <button class="btn btn-secondary" id="btn-boss">测试伪装屏</button>
+      </div>
+    </div>
+
+    <!-- Minimal Footer with subtle Afdian link -->
+    <div class="footer">
+      <div class="sponsor-links">
+        <a href="https://ifdian.net/a/7675a" target="_blank" class="sponsor-link">☕ 支持作者</a>
+      </div>
+      <span class="version">v1.0.0</span>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
