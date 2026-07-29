@@ -505,6 +505,46 @@ html.vsc-enabled body > *:not(#vsc-app-root):not(#vsc-boss-screen):not(#vsc-cmd-
   color: var(--vsc-fg-muted);
 }
 
+.vsc-btn-expand-sub {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--vsc-syn-keyword) !important;
+  cursor: pointer !important;
+  font-family: 'Fira Code', Consolas, monospace;
+}
+
+.vsc-btn-expand-sub:hover {
+  text-decoration: underline !important;
+  opacity: 0.9;
+}
+
+.vsc-term-load-more {
+  margin: 16px 0 12px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.vsc-btn-more-root-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: var(--vsc-bg-input);
+  color: var(--vsc-fg);
+  border: 1px solid var(--vsc-border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vsc-btn-more-root-comments:hover {
+  background-color: var(--vsc-bg-hover);
+  border-color: var(--vsc-accent);
+}
+
 /* Custom Formatting inside Canvas */
 .vsc-code-block {
   background: rgba(0, 0, 0, 0.2);

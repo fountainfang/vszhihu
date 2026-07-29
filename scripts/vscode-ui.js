@@ -328,7 +328,7 @@ window.VSZhihuUI = {
     const self = this;
     document.addEventListener('click', (e) => {
       // 1. Comment Trigger / Comment Link
-      const commentBtn = e.target.closest('.vsc-btn-comment-trigger, .vsc-code-comment-link');
+      const commentBtn = e.target.closest('.vsc-btn-comment-trigger, .vsc-code-comment-link:not(.vsc-btn-expand-sub)');
       if (commentBtn) {
         e.preventDefault();
         e.stopPropagation();
@@ -369,7 +369,152 @@ window.VSZhihuUI = {
         return;
       }
 
-      // 2. View All Answers Button
+      // 2. Expand sub-comments / child replies
+      const expandSubBtn = e.target.closest('.vsc-btn-expand-sub');
+      if (expandSubBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const commentId = expandSubBtn.getAttribute('data-comment-id');
+        const offset = parseInt(expandSubBtn.getAttribute('data-offset'), 10) || 0;
+        const rootAuthor = expandSubBtn.getAttribute('data-root-author') || '原作者';
+
+        expandSubBtn.innerText = '⏳ 正在加载回复...';
+
+        const subApiUrl = `https://www.zhihu.com/api/v4/comments/${commentId}/child_comments?limit=20&offset=${offset}`;
+        fetch(subApiUrl)
+          .then(res => res.json())
+          .then(subJson => {
+            if (subJson.data && subJson.data.length > 0) {
+              const listEl = document.getElementById(`vsc-sub-list-${commentId}`);
+              if (listEl) {
+                let subHtml = '';
+                subJson.data.forEach((sub) => {
+                  const subAuthor = sub.author?.member?.name || '回复者';
+                  const replyTo = sub.reply_to_author?.member?.name || rootAuthor;
+                  const subContent = sub.content ? sub.content.replace(/<[^>]+>/g, '') : '';
+                  const subLikes = sub.vote_count || 0;
+
+                  subHtml += `  <div class="vsc-comment-sub">`;
+                  subHtml += `    <div style="color: var(--vsc-syn-keyword); font-weight: 500;">└─ @${subAuthor} <span style="color: var(--vsc-fg-muted);">回复</span> @${replyTo} <span style="color: var(--vsc-syn-number); float: right;">▲ ${subLikes}</span></div>`;
+                  subHtml += `    <div>${subContent}</div>`;
+                  subHtml += `  </div>`;
+                });
+                listEl.insertAdjacentHTML('beforeend', subHtml);
+              }
+
+              const isEnd = subJson.paging?.is_end;
+              const nextOffset = offset + subJson.data.length;
+              const totalCount = subJson.paging?.totals || 0;
+              const remaining = totalCount - nextOffset;
+
+              if (!isEnd && remaining > 0) {
+                expandSubBtn.setAttribute('data-offset', nextOffset);
+                expandSubBtn.innerText = `↳ 展开其他 ${remaining} 条回复...`;
+              } else {
+                expandSubBtn.remove();
+              }
+            } else {
+              expandSubBtn.remove();
+            }
+          })
+          .catch(() => {
+            expandSubBtn.innerText = '⚠️ 加载失败，点击重试';
+          });
+        return;
+      }
+
+      // 3. Load more root comments
+      const moreRootBtn = e.target.closest('.vsc-btn-more-root-comments');
+      if (moreRootBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const answerId = moreRootBtn.getAttribute('data-answer-id');
+        const apiCategory = moreRootBtn.getAttribute('data-category') || 'answers';
+        const offset = parseInt(moreRootBtn.getAttribute('data-offset'), 10) || 0;
+
+        moreRootBtn.innerText = '⏳ 正在加载更多评论...';
+        moreRootBtn.disabled = true;
+
+        const nextApiUrl = `https://www.zhihu.com/api/v4/${apiCategory}/${answerId}/root_comments?limit=20&offset=${offset}&order=normal`;
+
+        fetch(nextApiUrl)
+          .then(res => res.json())
+          .then(json => {
+            moreRootBtn.disabled = false;
+            if (json.data && json.data.length > 0) {
+              const container = document.getElementById('vsc-term-comments-list');
+              if (!container) return;
+
+              let html = '';
+              json.data.forEach((item) => {
+                const author = item.author?.member?.name || '匿名用户';
+                const content = item.content ? item.content.replace(/<[^>]+>/g, '') : '';
+                const likes = item.vote_count || 0;
+                const time = item.created_time ? new Date(item.created_time * 1000).toLocaleString() : '';
+                const childCount = item.child_comment_count || 0;
+                const initialChildren = item.child_comments || [];
+
+                html += `<div class="vsc-comment-card" id="vsc-cmt-${item.id}">`;
+                html += `  <div class="vsc-comment-header">`;
+                html += `    <span>┌─ @${author} <span style="color: var(--vsc-fg-muted); font-size: 11px;">(${time})</span></span>`;
+                html += `    <span style="color: var(--vsc-syn-number);">▲ ${likes} 赞</span>`;
+                html += `  </div>`;
+                html += `  <div style="padding-left: 12px; color: var(--vsc-fg);">${content}</div>`;
+                html += `  <div class="vsc-comment-sub-list" id="vsc-sub-list-${item.id}">`;
+
+                initialChildren.forEach((sub) => {
+                  const subAuthor = sub.author?.member?.name || '回复者';
+                  const replyTo = sub.reply_to_author?.member?.name || author;
+                  const subContent = sub.content ? sub.content.replace(/<[^>]+>/g, '') : '';
+                  const subLikes = sub.vote_count || 0;
+
+                  html += `  <div class="vsc-comment-sub">`;
+                  html += `    <div style="color: var(--vsc-syn-keyword); font-weight: 500;">└─ @${subAuthor} <span style="color: var(--vsc-fg-muted);">回复</span> @${replyTo} <span style="color: var(--vsc-syn-number); float: right;">▲ ${subLikes}</span></div>`;
+                  html += `    <div>${subContent}</div>`;
+                  html += `  </div>`;
+                });
+
+                html += `  </div>`;
+
+                const remainingSubCount = childCount - initialChildren.length;
+                if (remainingSubCount > 0) {
+                  html += `  <div style="padding-left: 12px; margin-top: 6px;">`;
+                  html += `    <span class="vsc-code-comment-link vsc-btn-expand-sub" data-comment-id="${item.id}" data-offset="${initialChildren.length}" data-root-author="${escapeHtml(author)}">`;
+                  html += `      ↳ 展开其他 ${remainingSubCount} 条回复...`;
+                  html += `    </span>`;
+                  html += `  </div>`;
+                }
+
+                html += `</div>`;
+              });
+
+              container.insertAdjacentHTML('beforeend', html);
+
+              const nextOffset = offset + json.data.length;
+              const totals = json.paging?.totals || 0;
+              const isEnd = json.paging?.is_end;
+
+              if (!isEnd && (totals === 0 || nextOffset < totals)) {
+                moreRootBtn.setAttribute('data-offset', nextOffset);
+                moreRootBtn.innerText = `📥 加载更多评论 (已显示 ${nextOffset} / 共 ${totals || '多'} 条)`;
+              } else {
+                document.getElementById('vsc-term-load-more-box')?.remove();
+              }
+            } else {
+              document.getElementById('vsc-term-load-more-box')?.remove();
+            }
+          })
+          .catch(() => {
+            moreRootBtn.disabled = false;
+            moreRootBtn.innerText = '⚠️ 加载失败，点击重试';
+          });
+
+        return;
+      }
+
+      // 4. View All Answers Button
       const viewAllBtn = e.target.closest('.vsc-btn-view-all');
       if (viewAllBtn) {
         e.preventDefault();
@@ -386,25 +531,25 @@ window.VSZhihuUI = {
         return;
       }
 
-      // 3. Activity bar search / command palette
+      // 5. Activity bar search / command palette
       if (e.target.closest('#vsc-act-search, #vsc-sb-cmd')) {
         if (window.VSZhihuCommandPalette) window.VSZhihuCommandPalette.open();
         return;
       }
 
-      // 4. Boss key triggers
+      // 6. Boss key triggers
       if (e.target.closest('#vsc-act-boss, #vsc-sb-boss')) {
         self.toggleBossKey();
         return;
       }
 
-      // 5. Sponsor button
+      // 7. Sponsor button
       if (e.target.closest('#vsc-sb-sponsor')) {
         window.open('https://ifdian.net/a/7675a', '_blank');
         return;
       }
 
-      // 6. Navigation items
+      // 8. Navigation items
       if (e.target.closest('#vsc-act-hot, #vsc-item-hot')) {
         window.location.href = 'https://www.zhihu.com/hot';
         return;
@@ -426,14 +571,14 @@ window.VSZhihuUI = {
         return;
       }
 
-      // 7. Terminal Panel close / clear
+      // 9. Terminal Panel close / clear
       if (e.target.closest('#vsc-panel-close')) {
         document.getElementById('vsc-bottom-panel')?.remove();
         return;
       }
 
       if (e.target.closest('#vsc-panel-clear')) {
-        const body = document.getElementById('vsc-term-comments');
+        const body = document.getElementById('vsc-term-comments-list');
         if (body) body.innerHTML = '';
         return;
       }
@@ -476,24 +621,18 @@ window.VSZhihuUI = {
       <div class="vsc-panel-body" id="vsc-panel-body">
         <div><span class="vsc-term-prompt">bash-5.2$</span> zhihu-cli comments --target ${apiCategory}/${targetAnswerId || 'N/A'} --author "@${authorName}"</div>
         <div style="color: var(--vsc-fg-muted); margin: 6px 0;">[Zhihu API] Connecting to ${apiUrl}...</div>
-        <div id="vsc-term-comments">Fetching live comment thread...</div>
+        <div id="vsc-term-comments">
+          <div id="vsc-term-comments-list">Fetching live comment thread...</div>
+        </div>
       </div>
     `;
-
-    document.getElementById('vsc-panel-close')?.addEventListener('click', () => {
-      panel.remove();
-    });
-
-    document.getElementById('vsc-panel-clear')?.addEventListener('click', () => {
-      const body = document.getElementById('vsc-term-comments');
-      if (body) body.innerHTML = '';
-    });
 
     if (targetAnswerId) {
       fetch(apiUrl)
         .then(res => res.json())
         .then(json => {
-          const container = document.getElementById('vsc-term-comments');
+          const container = document.getElementById('vsc-term-comments-list');
+          const termBox = document.getElementById('vsc-term-comments');
           if (!container) return;
 
           if (!json.data || json.data.length === 0) {
@@ -501,37 +640,64 @@ window.VSZhihuUI = {
             return;
           }
 
-          let html = `<div style="color: var(--vsc-syn-comment); margin-bottom: 12px;">// Successfully loaded ${json.data.length} root comment threads</div>`;
+          let html = `<div style="color: var(--vsc-syn-comment); margin-bottom: 12px;">// Successfully loaded ${json.data.length} root comment threads (Total: ${json.paging?.totals || json.data.length})</div>`;
           
           json.data.forEach((item) => {
             const author = item.author?.member?.name || '匿名用户';
             const content = item.content ? item.content.replace(/<[^>]+>/g, '') : '';
             const likes = item.vote_count || 0;
             const time = item.created_time ? new Date(item.created_time * 1000).toLocaleString() : '';
+            const childCount = item.child_comment_count || 0;
+            const initialChildren = item.child_comments || [];
 
-            html += `<div class="vsc-comment-card">`;
+            html += `<div class="vsc-comment-card" id="vsc-cmt-${item.id}">`;
             html += `  <div class="vsc-comment-header">`;
             html += `    <span>┌─ @${author} <span style="color: var(--vsc-fg-muted); font-size: 11px;">(${time})</span></span>`;
             html += `    <span style="color: var(--vsc-syn-number);">▲ ${likes} 赞</span>`;
             html += `  </div>`;
             html += `  <div style="padding-left: 12px; color: var(--vsc-fg);">${content}</div>`;
+            html += `  <div class="vsc-comment-sub-list" id="vsc-sub-list-${item.id}">`;
 
-            if (item.child_comments && item.child_comments.length > 0) {
-              item.child_comments.forEach((sub) => {
-                const subAuthor = sub.author?.member?.name || '回复者';
-                const replyTo = sub.reply_to_author?.member?.name || author;
-                const subContent = sub.content ? sub.content.replace(/<[^>]+>/g, '') : '';
-                const subLikes = sub.vote_count || 0;
+            initialChildren.forEach((sub) => {
+              const subAuthor = sub.author?.member?.name || '回复者';
+              const replyTo = sub.reply_to_author?.member?.name || author;
+              const subContent = sub.content ? sub.content.replace(/<[^>]+>/g, '') : '';
+              const subLikes = sub.vote_count || 0;
 
-                html += `  <div class="vsc-comment-sub">`;
-                html += `    <div style="color: var(--vsc-syn-keyword); font-weight: 500;">└─ @${subAuthor} <span style="color: var(--vsc-fg-muted);">回复</span> @${replyTo} <span style="color: var(--vsc-syn-number); float: right;">▲ ${subLikes}</span></div>`;
-                html += `    <div>${subContent}</div>`;
-                html += `  </div>`;
-              });
+              html += `  <div class="vsc-comment-sub">`;
+              html += `    <div style="color: var(--vsc-syn-keyword); font-weight: 500;">└─ @${subAuthor} <span style="color: var(--vsc-fg-muted);">回复</span> @${replyTo} <span style="color: var(--vsc-syn-number); float: right;">▲ ${subLikes}</span></div>`;
+              html += `    <div>${subContent}</div>`;
+              html += `  </div>`;
+            });
+
+            html += `  </div>`;
+
+            const remainingSubCount = childCount - initialChildren.length;
+            if (remainingSubCount > 0) {
+              html += `  <div style="padding-left: 12px; margin-top: 6px;">`;
+              html += `    <span class="vsc-code-comment-link vsc-btn-expand-sub" data-comment-id="${item.id}" data-offset="${initialChildren.length}" data-root-author="${escapeHtml(author)}">`;
+              html += `      ↳ 展开其他 ${remainingSubCount} 条回复...`;
+              html += `    </span>`;
+              html += `  </div>`;
             }
+
             html += `</div>`;
           });
           container.innerHTML = html;
+
+          // Render Load More Root Comments button if pagination is not ended
+          if (!json.paging?.is_end && json.data.length >= 20) {
+            const nextOffset = json.data.length;
+            const totals = json.paging?.totals || 0;
+            const moreHtml = `
+              <div class="vsc-term-load-more" id="vsc-term-load-more-box">
+                <button class="vsc-btn-action vsc-btn-more-root-comments" data-answer-id="${targetAnswerId}" data-category="${apiCategory}" data-offset="${nextOffset}">
+                  📥 加载更多评论 (已显示 ${nextOffset} / 共 ${totals || '多'} 条)
+                </button>
+              </div>
+            `;
+            termBox?.insertAdjacentHTML('beforeend', moreHtml);
+          }
         })
         .catch(err => {
           console.error('[VSCode-Zhihu] API fetch error:', err);
