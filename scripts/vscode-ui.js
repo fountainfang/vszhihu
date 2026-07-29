@@ -308,44 +308,19 @@ window.VSZhihuUI = {
   },
 
   bindClickEvents: function() {
-    document.getElementById('vsc-act-search')?.addEventListener('click', () => {
-      if (window.VSZhihuCommandPalette) window.VSZhihuCommandPalette.open();
-    });
-
-    document.getElementById('vsc-act-boss')?.addEventListener('click', () => this.toggleBossKey());
-    document.getElementById('vsc-sb-boss')?.addEventListener('click', () => this.toggleBossKey());
-    document.getElementById('vsc-sb-sponsor')?.addEventListener('click', () => window.open('https://ifdian.net/a/7675a', '_blank'));
-
-    document.getElementById('vsc-sb-cmd')?.addEventListener('click', () => {
-      if (window.VSZhihuCommandPalette) window.VSZhihuCommandPalette.open();
-    });
-
-    document.getElementById('vsc-act-hot')?.addEventListener('click', () => {
-      window.location.href = 'https://www.zhihu.com/hot';
-    });
-
-    document.getElementById('vsc-item-recommend')?.addEventListener('click', () => {
-      window.location.href = 'https://www.zhihu.com/';
-    });
-
-    document.getElementById('vsc-item-following')?.addEventListener('click', () => {
-      window.location.href = 'https://www.zhihu.com/follow';
-    });
-
-    document.getElementById('vsc-item-hot')?.addEventListener('click', () => {
-      window.location.href = 'https://www.zhihu.com/hot';
-    });
-
-    document.getElementById('vsc-item-search')?.addEventListener('click', () => {
-      const query = prompt('Search Zhihu:');
-      if (query) window.location.href = `https://www.zhihu.com/search?type=content&q=${encodeURIComponent(query)}`;
-    });
+    if (this._eventsBound) return;
+    this._eventsBound = true;
 
     const self = this;
-    document.querySelectorAll('.vsc-btn-comment-trigger, .vsc-code-comment-link').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const idx = parseInt(btn.getAttribute('data-answer-idx'), 10) || 0;
-        const btnAnswerId = btn.getAttribute('data-answer-id');
+    document.addEventListener('click', (e) => {
+      // 1. Comment Trigger / Comment Link
+      const commentBtn = e.target.closest('.vsc-btn-comment-trigger, .vsc-code-comment-link');
+      if (commentBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const idx = parseInt(commentBtn.getAttribute('data-answer-idx'), 10) || 0;
+        const btnAnswerId = commentBtn.getAttribute('data-answer-id');
         const targetAns = self.parsedData?.answers?.[idx];
         let answerId = btnAnswerId || targetAns?.answerId || '';
 
@@ -369,32 +344,85 @@ window.VSZhihuUI = {
           const btns = Array.from(card.querySelectorAll('button, .Button, [role="button"]'));
           const nativeCommentBtn = btns.find(b => b.innerText.includes('评论')) || card.querySelector('.Button--comment');
           if (nativeCommentBtn) {
-            nativeCommentBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-            nativeCommentBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-            nativeCommentBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-            if (nativeCommentBtn.click) nativeCommentBtn.click();
+            try {
+              nativeCommentBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+              nativeCommentBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+              nativeCommentBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+              if (nativeCommentBtn.click) nativeCommentBtn.click();
+            } catch(err) {}
           }
         }
-      });
-    });
+        return;
+      }
 
-    document.querySelectorAll('.vsc-btn-view-all').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
+      // 2. View All Answers Button
+      const viewAllBtn = e.target.closest('.vsc-btn-view-all');
+      if (viewAllBtn) {
         e.preventDefault();
-        const url = btn.getAttribute('data-question-url') || btn.getAttribute('href');
-
+        e.stopPropagation();
+        const url = viewAllBtn.getAttribute('data-question-url') || viewAllBtn.getAttribute('href');
         const nativeBtn = document.querySelector('.ViewAll, .QuestionMainAction, [class*="ViewAll"]');
         if (nativeBtn) {
-          try {
-            nativeBtn.click();
-          } catch(err) {}
+          try { nativeBtn.click(); } catch(err) {}
         }
-
         if (url) {
           const targetUrl = url.startsWith('http') ? url : `https://www.zhihu.com${url}`;
           window.location.href = targetUrl;
         }
-      });
+        return;
+      }
+
+      // 3. Activity bar search / command palette
+      if (e.target.closest('#vsc-act-search, #vsc-sb-cmd')) {
+        if (window.VSZhihuCommandPalette) window.VSZhihuCommandPalette.open();
+        return;
+      }
+
+      // 4. Boss key triggers
+      if (e.target.closest('#vsc-act-boss, #vsc-sb-boss')) {
+        self.toggleBossKey();
+        return;
+      }
+
+      // 5. Sponsor button
+      if (e.target.closest('#vsc-sb-sponsor')) {
+        window.open('https://ifdian.net/a/7675a', '_blank');
+        return;
+      }
+
+      // 6. Navigation items
+      if (e.target.closest('#vsc-act-hot, #vsc-item-hot')) {
+        window.location.href = 'https://www.zhihu.com/hot';
+        return;
+      }
+
+      if (e.target.closest('#vsc-item-recommend')) {
+        window.location.href = 'https://www.zhihu.com/';
+        return;
+      }
+
+      if (e.target.closest('#vsc-item-following')) {
+        window.location.href = 'https://www.zhihu.com/follow';
+        return;
+      }
+
+      if (e.target.closest('#vsc-item-search')) {
+        const query = prompt('Search Zhihu:');
+        if (query) window.location.href = `https://www.zhihu.com/search?type=content&q=${encodeURIComponent(query)}`;
+        return;
+      }
+
+      // 7. Terminal Panel close / clear
+      if (e.target.closest('#vsc-panel-close')) {
+        document.getElementById('vsc-bottom-panel')?.remove();
+        return;
+      }
+
+      if (e.target.closest('#vsc-panel-clear')) {
+        const body = document.getElementById('vsc-term-comments');
+        if (body) body.innerHTML = '';
+        return;
+      }
     });
   },
 
@@ -408,6 +436,7 @@ window.VSZhihuUI = {
       panel.id = 'vsc-bottom-panel';
       editor.appendChild(panel);
     }
+    panel.style.display = 'flex';
 
     const targetAns = this.parsedData?.answers?.[answerIdx];
     const targetAnswerId = answerId || targetAns?.answerId || '';
