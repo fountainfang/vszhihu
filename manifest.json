@@ -27,6 +27,15 @@
         "https://*.zhihu.com/*"
       ],
       "css": [
+        "styles/initial-hide.css"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://*.zhihu.com/*"
+      ],
+      "css": [
         "styles/themes.css",
         "styles/vscode.css"
       ],

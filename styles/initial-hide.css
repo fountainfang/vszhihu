@@ -1,0 +1,14 @@
+/* VSCode Zhihu - Initial Hide (Prevent Flash of Original Content)
+ * Injected at document_start so the body starts hidden before any paint.
+ * Once content.js has built the VS Code overlay (or determined the
+ * extension is disabled), it adds 'vsc-zhihu-ready' to <html> to reveal. */
+
+html body {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+html.vsc-zhihu-ready body {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
