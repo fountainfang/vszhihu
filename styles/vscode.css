@@ -31,8 +31,7 @@ html.vsc-enabled body > *:not(#vsc-app-root):not(#vsc-boss-screen):not(#vsc-cmd-
   top: 0 !important;
   left: 0 !important;
   width: 100vw !important;
-  height: 100vh !important;
-  overflow: hidden !important;
+  min-height: 100vh !important;
   pointer-events: none !important;
 }
 

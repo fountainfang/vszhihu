@@ -170,8 +170,8 @@ window.VSZhihuParser = {
     const detailText = detailEl ? detailEl.innerText.trim() : '';
 
     // Target ONLY top-level answer cards inside main column, filtering out nested parent/child containers
-    const mainCol = document.querySelector('.Question-mainColumn, .Question-main') || document;
-    const rawCards = Array.from(mainCol.querySelectorAll('.List-item, .AnswerCard, .AnswerItem, .ContentItem'))
+    const mainCol = document.querySelector('.Question-mainColumn, .Question-main, .QuestionAnswers-answers, .List') || document;
+    const rawCards = Array.from(mainCol.querySelectorAll('.List-item, .AnswerCard, .AnswerItem, .ContentItem, [class*="AnswerItem"], [class*="ContentItem"]'))
                           .filter(c => !c.closest('.QuestionHeader'));
     
     const answerCards = rawCards.filter(card => {

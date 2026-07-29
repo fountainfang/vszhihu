@@ -246,24 +246,38 @@ window.VSZhihuUI = {
   bindInfiniteScroll: function(codeViewEl) {
     let isLoading = false;
     codeViewEl.addEventListener('scroll', () => {
-      if (codeViewEl.scrollTop + codeViewEl.clientHeight >= codeViewEl.scrollHeight - 400) {
+      if (codeViewEl.scrollTop + codeViewEl.clientHeight >= codeViewEl.scrollHeight - 600) {
         if (!isLoading) {
           isLoading = true;
-          // Scroll native document to bottom
-          const scrollH = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-          window.scrollTo(0, scrollH);
-          
-          // Multi-target scroll event dispatching for React pagination listeners
-          const targets = [window, document, document.documentElement, document.body, document.querySelector('.Question-mainColumn'), document.querySelector('.Question-main')].filter(Boolean);
+
+          // Incrementally scroll native window to trigger React pagination listeners
+          const currentScroll = window.scrollY || window.pageYOffset || 0;
+          const maxScroll = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 6000);
+          const nextScroll = currentScroll + 1200;
+
+          window.scrollTo(0, Math.min(nextScroll, maxScroll));
+
+          // Dispatch scroll events to all candidate native containers
+          const targets = [
+            window,
+            document,
+            document.documentElement,
+            document.body,
+            document.querySelector('.Question-mainColumn'),
+            document.querySelector('.Question-main'),
+            document.querySelector('.QuestionAnswers-answers'),
+            document.querySelector('.List')
+          ].filter(Boolean);
+
           targets.forEach(target => {
             try {
-              target.dispatchEvent(new Event('scroll', { bubbles: true }));
+              target.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
             } catch(e) {}
           });
 
           setTimeout(() => {
             isLoading = false;
-          }, 600);
+          }, 350);
         }
       }
     });
