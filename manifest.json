@@ -52,6 +52,7 @@
         "scripts/parser.js",
         "scripts/command-palette.js",
         "scripts/vscode-ui.js",
+        "scripts/favicon.js",
         "content.js"
       ],
       "run_at": "document_end"
