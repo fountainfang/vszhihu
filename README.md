@@ -32,9 +32,13 @@
 
 ## 🚀 安装指引
 
+### 方式 1：Chrome Web Store 官方商店安装（推荐）
+👉 [点击前往 Chrome Web Store 直接一键安装](https://chromewebstore.google.com/detail/vscode-zhihu-%E7%9F%A5%E4%B9%8E-vs-code-%E7%9A%AE/flfmjjfkfnmnlkhnfjghhefpapfcdedn?authuser=0&hl=zh-CN)
+
+### 方式 2：开发者模式本地安装
 1. **下载源码**：克隆或下载本仓库至本地文件夹：
    ```bash
-   git clone https://github.com/your-username/vszhihu.git
+   git clone https://github.com/fountainfang/vszhihu.git
    ```
 2. **打开 Chrome 扩展管理**：
    在浏览器地址栏输入 `chrome://extensions` 并按回车。
@@ -70,6 +74,7 @@ vszhihu/
 │   ├── vscode.css         # VS Code 界面主布局与组件样式
 │   └── themes.css         # 颜色主题定义 (Dark+, One Dark, Monokai, Light)
 ├── scripts/
+│   ├── preload.js         # document_start 零闪烁预加载脚本
 │   ├── parser.js          # 知乎 DOM 解析与 TypeScript 代码格式化引擎
 │   ├── vscode-ui.js       # VS Code UI 渲染引擎与 Terminal 评论面板逻辑
 │   └── command-palette.js # Cmd+Shift+P 命令面板模块
