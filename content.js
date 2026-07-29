@@ -3,6 +3,9 @@
  */
 
 (function() {
+  // 让知乎浏览器标签页图标与 VS Code 皮肤保持一致。
+  window.VSZhihuFavicon?.keepReplaced();
+
   // Synchronously inject vsc-enabled class and saved theme BEFORE page renders to prevent white flash
   try {
     document.documentElement.classList.add('vsc-enabled');
