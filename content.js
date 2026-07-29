@@ -39,10 +39,9 @@
       if (!chrome.runtime.lastError && settings && settings.enabled !== undefined) {
         currentSettings = Object.assign(currentSettings, settings);
       }
-      
       if (currentSettings.enabled === false) {
         document.documentElement.classList.remove('vsc-enabled');
-        document.documentElement.classList.add('vsc-disabled');
+        document.documentElement.classList.add('vsc-disabled', 'vsc-zhihu-ready');
         try { localStorage.setItem('vsc_enabled', 'false'); } catch(e) {}
       } else {
         document.documentElement.classList.add('vsc-enabled');
@@ -100,6 +99,9 @@
     if (window.VSZhihuUI) {
       window.VSZhihuUI.init(settings, data);
     }
+
+    // Reveal the VS Code overlay (hidden since document_start to prevent flash)
+    document.documentElement.classList.add('vsc-zhihu-ready');
 
     // Dynamic retry polling for delayed React hydration (up to 30 seconds)
     let retryCount = 0;
