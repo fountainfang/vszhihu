@@ -74,6 +74,67 @@ window.VSZhihuParser = {
     };
   },
 
+  extractCommentsFromInitialData: function() {
+    try {
+      const el = document.getElementById('js-initialData');
+      let data = null;
+      if (el && el.textContent) {
+        data = JSON.parse(el.textContent);
+      } else if (window.__INITIAL_STATE__) {
+        data = window.__INITIAL_STATE__;
+      }
+
+      if (!data) return [];
+
+      const initialState = data.initialState || data;
+      const entities = initialState.entities || {};
+      const commentsMap = entities.comments || {};
+
+      const commentsList = Object.values(commentsMap);
+      if (commentsList.length === 0) return [];
+
+      const rootComments = commentsList.filter(c => !c.replyToCommentId && !c.reply_to_comment_id && !c.parentId && !c.replyToAnswerId);
+
+      const parsedComments = rootComments.map(c => {
+        const authorName = c.author?.member?.name || c.author?.name || '知乎用户';
+        const content = (c.content || '').replace(/<[^>]+>/g, '').trim();
+        const likes = c.voteCount || c.vote_count || c.likes || 0;
+        const createdTime = c.createdTime || c.created_time || 0;
+        const childCount = c.childCommentCount || c.child_comment_count || 0;
+
+        const replies = [];
+        if (c.childComments && Array.isArray(c.childComments)) {
+          c.childComments.forEach(child => {
+            const childObj = typeof child === 'object' ? child : commentsMap[child];
+            if (childObj) {
+              const rAuthor = childObj.author?.member?.name || childObj.author?.name || '回复者';
+              const rText = (childObj.content || '').replace(/<[^>]+>/g, '').trim();
+              const rLikes = childObj.voteCount || childObj.vote_count || 0;
+              if (rText) {
+                replies.push({ author: rAuthor, text: rText, likes: rLikes });
+              }
+            }
+          });
+        }
+
+        return {
+          id: c.id,
+          author: authorName,
+          text: content,
+          likes: likes,
+          time: createdTime ? new Date(createdTime * 1000).toLocaleString() : '',
+          childCount: childCount,
+          replies: replies
+        };
+      });
+
+      return parsedComments;
+    } catch(e) {
+      console.warn('[VSCode-Zhihu] Error parsing initialData comments:', e);
+      return [];
+    }
+  },
+
   /**
    * Parse Article Page (`/p/123456` or `/zhuanlan/`)
    */
@@ -106,43 +167,47 @@ window.VSZhihuParser = {
     const pathMatch = window.location.pathname.match(/p\/(\d+)/);
     if (pathMatch) articleId = pathMatch[1];
 
-    // Parse DOM comments if available on page
-    const commentNodes = Array.from(document.querySelectorAll('.NestComment, .CommentItemV2, .CommentItem, [class*="CommentItem"], [class*="NestComment"]'));
-    const topComments = commentNodes.filter(node => !node.parentElement || !node.parentElement.closest('.NestComment, .CommentItemV2, .CommentItem, [class*="NestComment"], [class*="CommentItem"], [class*="replyList"]'));
-    const comments = [];
+    // 1. Try extracting comments from js-initialData JSON state first
+    let comments = this.extractCommentsFromInitialData();
 
-    topComments.forEach((cNode, cIdx) => {
-      const cAuthorEl = cNode.querySelector('.UserLink-link, .CommentItem-author, .CommentItemV2-author, a[href*="/people/"], .AuthorInfo-name, [class*="UserLink"]');
-      const cAuthor = cAuthorEl ? cAuthorEl.innerText.trim() : '知乎用户';
-      
-      const cTextEl = cNode.querySelector('.CommentItem-content, .CommentItemV2-content, .CommentItem-text, .RichText, [class*="content"]');
-      const cText = cTextEl ? cTextEl.innerText.trim() : '';
+    // 2. Fallback to DOM comments if initialData had no comments
+    if (comments.length === 0) {
+      const commentNodes = Array.from(document.querySelectorAll('.NestComment, .CommentItemV2, .CommentItem, [class*="CommentItem"], [class*="NestComment"]'));
+      const topComments = commentNodes.filter(node => !node.parentElement || !node.parentElement.closest('.NestComment, .CommentItemV2, .CommentItem, [class*="NestComment"], [class*="CommentItem"], [class*="replyList"]'));
 
-      const cLikeEl = cNode.querySelector('.Button--like, .CommentItem-likeCount, [class*="like"]');
-      const cLikes = cLikeEl ? cLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
+      topComments.forEach((cNode, cIdx) => {
+        const cAuthorEl = cNode.querySelector('.UserLink-link, .CommentItem-author, .CommentItemV2-author, a[href*="/people/"], .AuthorInfo-name, [class*="UserLink"]');
+        const cAuthor = cAuthorEl ? cAuthorEl.innerText.trim() : '知乎用户';
+        
+        const cTextEl = cNode.querySelector('.CommentItem-content, .CommentItemV2-content, .CommentItem-text, .RichText, [class*="content"]');
+        const cText = cTextEl ? cTextEl.innerText.trim() : '';
 
-      const replyNodes = cNode.querySelectorAll('.NestComment-children [class*="CommentItem"], .CommentItem-reply, .CommentItemV2-replyList [class*="CommentItemV2"], [class*="replyList"] [class*="CommentItem"]');
-      const replies = [];
+        const cLikeEl = cNode.querySelector('.Button--like, .CommentItem-likeCount, [class*="like"]');
+        const cLikes = cLikeEl ? cLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
 
-      replyNodes.forEach((rNode, rIdx) => {
-        const rAuthorEl = rNode.querySelector('.UserLink-link, .CommentItem-author, .CommentItemV2-author, a[href*="/people/"]');
-        const rAuthor = rAuthorEl ? rAuthorEl.innerText.trim() : '回复者';
+        const replyNodes = cNode.querySelectorAll('.NestComment-children [class*="CommentItem"], .CommentItem-reply, .CommentItemV2-replyList [class*="CommentItemV2"], [class*="replyList"] [class*="CommentItem"]');
+        const replies = [];
 
-        const rTextEl = rNode.querySelector('.CommentItem-content, .CommentItemV2-content, .RichText');
-        const rText = rTextEl ? rTextEl.innerText.trim() : '';
+        replyNodes.forEach((rNode, rIdx) => {
+          const rAuthorEl = rNode.querySelector('.UserLink-link, .CommentItem-author, .CommentItemV2-author, a[href*="/people/"]');
+          const rAuthor = rAuthorEl ? rAuthorEl.innerText.trim() : '回复者';
 
-        const rLikeEl = rNode.querySelector('.Button--like, [class*="like"]');
-        const rLikes = rLikeEl ? rLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
+          const rTextEl = rNode.querySelector('.CommentItem-content, .CommentItemV2-content, .RichText');
+          const rText = rTextEl ? rTextEl.innerText.trim() : '';
 
-        if (rText && rText !== cText) {
-          replies.push({ id: `1_${cIdx + 1}_sub_${rIdx + 1}`, author: rAuthor, text: rText, likes: rLikes });
+          const rLikeEl = rNode.querySelector('.Button--like, [class*="like"]');
+          const rLikes = rLikeEl ? rLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
+
+          if (rText && rText !== cText) {
+            replies.push({ id: `1_${cIdx + 1}_sub_${rIdx + 1}`, author: rAuthor, text: rText, likes: rLikes });
+          }
+        });
+
+        if (cText) {
+          comments.push({ id: `1_${cIdx + 1}`, author: cAuthor, text: cText, likes: cLikes, replies: replies });
         }
       });
-
-      if (cText) {
-        comments.push({ id: `1_${cIdx + 1}`, author: cAuthor, text: cText, likes: cLikes, replies: replies });
-      }
-    });
+    }
 
     if (comments.length > 0 && commentCount === '0') {
       commentCount = String(comments.length);

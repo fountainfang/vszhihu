@@ -796,7 +796,12 @@ window.VSZhihuUI = {
     const targetAns = this.parsedData?.answers?.[answerIdx];
     let comments = (targetAns && targetAns.comments && targetAns.comments.length > 0) ? targetAns.comments : [];
 
-    // If initial parse had no comments, dynamically extract from current DOM tree
+    // 1. Try extracting comments from js-initialData JSON state first
+    if (comments.length === 0 && window.VSZhihuParser) {
+      comments = window.VSZhihuParser.extractCommentsFromInitialData();
+    }
+
+    // 2. If initial parse and initialData had no comments, dynamically extract from current DOM tree
     if (comments.length === 0) {
       const commentNodes = Array.from(document.querySelectorAll(
         '.NestComment, .CommentItemV2, .CommentItem, ' +
