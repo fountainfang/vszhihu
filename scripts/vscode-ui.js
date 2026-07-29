@@ -686,7 +686,7 @@ window.VSZhihuUI = {
 
     const isArticle = this.parsedData?.type === 'article' || window.location.pathname.includes('/p/');
     const apiCategory = isArticle ? 'articles' : 'answers';
-    const apiUrl = `https://www.zhihu.com/api/v4/comment_v5/${apiCategory}/${targetAnswerId}/root_comments?limit=20&offset=0&order=normal`;
+    const statusCategory = isArticle ? 'article' : 'answer';
 
     panel.innerHTML = `
       <div class="vsc-panel-header">
@@ -702,8 +702,8 @@ window.VSZhihuUI = {
         </div>
       </div>
       <div class="vsc-panel-body" id="vsc-panel-body">
-        <div><span class="vsc-term-prompt">bash-5.2$</span> zhihu-cli comments --target ${apiCategory}/${targetAnswerId || 'N/A'} --author "@${authorName}"</div>
-        <div style="color: var(--vsc-fg-muted); margin: 6px 0;">[Zhihu API] Connecting to ${apiUrl}...</div>
+        <div><span class="vsc-term-prompt">bash-5.2$</span> zhihu-cli comments --target ${statusCategory}/${targetAnswerId || 'N/A'} --author "@${authorName}"</div>
+        <div style="color: var(--vsc-fg-muted); margin: 6px 0;">[Zhihu API] Connecting to live comment stream for ${statusCategory}/${targetAnswerId || 'N/A'}...</div>
         <div id="vsc-term-comments">
           <div id="vsc-term-comments-list">Fetching live comment thread...</div>
         </div>
