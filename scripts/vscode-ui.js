@@ -710,7 +710,7 @@ window.VSZhihuUI = {
       </div>
     `;
 
-    if (targetAnswerId) {
+    if (targetAnswerId && !isArticle) {
       this.fetchCommentThread(apiCategory, targetAnswerId, 0)
         .then(json => {
           const container = document.getElementById('vsc-term-comments-list');
