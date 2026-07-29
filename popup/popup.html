@@ -12,6 +12,7 @@
       <div class="logo">
         <svg class="icon" viewBox="0 0 24 24"><path fill="#007acc" d="M17.5 0h-9L7 1.5V3H4.5L3 4.5v15L4.5 21h12l1.5-1.5V18h3l1.5-1.5v-15L21 0h-3.5zM16 19.5H4.5v-15H7V15l1.5 1.5h7.5v3zm4.5-3H9V1.5h8.5V6H21.5v10.5z"/></svg>
         <span>VSCode Zhihu</span>
+        <span class="pro-tag" id="pro-tag">FREE</span>
       </div>
       <label class="switch" title="开启/关闭 VS Code 视图">
         <input type="checkbox" id="toggle-enabled" checked>
@@ -24,14 +25,20 @@
       <div class="setting-row">
         <span class="label">配色主题</span>
         <select id="select-theme" class="select-input">
-          <option value="dark-plus">VS Code Dark+ (默认)</option>
-          <option value="tokyo-night">Tokyo Night</option>
-          <option value="cyberpunk">Cyberpunk Neon</option>
-          <option value="one-dark">One Dark Pro</option>
-          <option value="monokai">Monokai</option>
-          <option value="solarized-dark">Solarized Dark</option>
-          <option value="light-modern">Light Modern</option>
+          <option value="dark-plus">VS Code Dark+ (免费)</option>
+          <option value="tokyo-night">🔒 Tokyo Night (Pro)</option>
+          <option value="cyberpunk">🔒 Cyberpunk Neon (Pro)</option>
+          <option value="one-dark">🔒 One Dark Pro (Pro)</option>
+          <option value="monokai">🔒 Monokai (Pro)</option>
+          <option value="solarized-dark">🔒 Solarized Dark (Pro)</option>
+          <option value="light-modern">🔒 Light Modern (Pro)</option>
         </select>
+      </div>
+
+      <!-- Compact License Key Row (Visible when FREE, turns into '已激活' when PRO) -->
+      <div class="setting-row" id="row-activation">
+        <input type="text" id="input-license-key" class="text-input" placeholder="🔑 输入 Pro 激活码...">
+        <button class="btn btn-primary" id="btn-activate-pro">激活</button>
       </div>
 
       <!-- Boss Key Test Button -->
@@ -41,12 +48,14 @@
       </div>
     </div>
 
-    <!-- Minimal Footer with subtle Afdian link -->
+    <!-- Minimal Footer with subtle Afdian & Crypto links -->
     <div class="footer">
       <div class="sponsor-links">
-        <a href="https://ifdian.net/a/7675a" target="_blank" class="sponsor-link">☕ 支持作者</a>
+        <a href="https://ifdian.net/a/7675a" target="_blank" class="sponsor-link">☕ 爱发电</a>
+        <span class="dot">•</span>
+        <span class="sponsor-link" id="btn-copy-crypto" title="0x51CA20f139462939788e703542517e4feea2Da10">🪙 Crypto 钱包</span>
       </div>
-      <span class="version">v1.0.0</span>
+      <span class="version">v1.0.1</span>
     </div>
   </div>
 

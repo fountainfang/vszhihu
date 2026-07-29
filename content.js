@@ -3,10 +3,35 @@
  */
 
 (function() {
+  // Synchronously inject vsc-enabled class and saved theme BEFORE page renders to prevent white flash
+  try {
+    document.documentElement.classList.add('vsc-enabled');
+    const cachedTheme = localStorage.getItem('vsc_theme') || 'dark-plus';
+    document.documentElement.setAttribute('data-vsc-theme', cachedTheme);
+  } catch(e) {}
+
   console.log('[VSCode-Zhihu] Content script initialized on:', window.location.href);
 
-  let currentSettings = { enabled: true, theme: 'dark-plus', codeViewMode: 'code' };
+  let currentSettings = { enabled: true, theme: localStorage.getItem('vsc_theme') || 'dark-plus', codeViewMode: 'code' };
   let lastPathname = window.location.pathname;
+
+  function runWhenBodyReady(fn) {
+    if (document.body) {
+      fn();
+    } else {
+      const bodyObserver = new MutationObserver(() => {
+        if (document.body) {
+          bodyObserver.disconnect();
+          fn();
+        }
+      });
+      bodyObserver.observe(document.documentElement, { childList: true });
+      document.addEventListener('DOMContentLoaded', () => {
+        bodyObserver.disconnect();
+        if (document.body) fn();
+      }, { once: true });
+    }
+  }
 
   // Retrieve user settings from background/storage
   try {
@@ -15,13 +40,23 @@
         currentSettings = Object.assign(currentSettings, settings);
       }
       
-      if (currentSettings.enabled !== false) {
-        startVSCodeMode(currentSettings);
+      if (currentSettings.enabled === false) {
+        document.documentElement.classList.remove('vsc-enabled');
+        document.documentElement.classList.add('vsc-disabled');
+        try { localStorage.setItem('vsc_enabled', 'false'); } catch(e) {}
+      } else {
+        document.documentElement.classList.add('vsc-enabled');
+        document.documentElement.classList.remove('vsc-disabled');
+        try { localStorage.setItem('vsc_enabled', 'true'); } catch(e) {}
+        if (currentSettings.theme) {
+          document.documentElement.setAttribute('data-vsc-theme', currentSettings.theme);
+          try { localStorage.setItem('vsc_theme', currentSettings.theme); } catch(e) {}
+        }
+        runWhenBodyReady(() => startVSCodeMode(currentSettings));
       }
     });
   } catch(e) {
-    // Fallback if background extension context is warming up
-    startVSCodeMode(currentSettings);
+    runWhenBodyReady(() => startVSCodeMode(currentSettings));
   }
 
   // Listen for popup settings messages (theme change, boss key, custom code)
@@ -73,14 +108,14 @@
       const refreshedData = parseCurrentPage();
       const hasContent = (refreshedData.feedList && refreshedData.feedList.length > 0) || (refreshedData.answers && refreshedData.answers.length > 0);
 
-      if (hasContent || retryCount >= 100) {
-        if (hasContent && window.VSZhihuUI) {
+      if (hasContent) {
+        if (window.VSZhihuUI) {
           window.VSZhihuUI.parsedData = refreshedData;
           window.VSZhihuUI.createAppRoot();
         }
-        if (hasContent || retryCount >= 100) {
-          clearInterval(retryInterval);
-        }
+        clearInterval(retryInterval);
+      } else if (retryCount >= 100) {
+        clearInterval(retryInterval);
       }
     }, 300);
 
@@ -114,6 +149,8 @@
       }, 250);
     });
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    if (document.body) {
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
   }
 })();

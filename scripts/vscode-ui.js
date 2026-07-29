@@ -33,6 +33,7 @@ window.VSZhihuUI = {
   createBossScreen: function() {
     let boss = document.getElementById('vsc-boss-screen');
     if (!boss) {
+      if (!document.body) return;
       boss = document.createElement('div');
       boss.id = 'vsc-boss-screen';
       document.body.appendChild(boss);
@@ -90,6 +91,7 @@ window.VSZhihuUI = {
     const savedScrollTop = existingCodeView ? existingCodeView.scrollTop : 0;
 
     if (!app) {
+      if (!document.body) return;
       app = document.createElement('div');
       app.id = 'vsc-app-root';
       document.body.appendChild(app);
@@ -276,6 +278,7 @@ window.VSZhihuUI = {
   setTheme: function(themeName) {
     this.theme = themeName;
     document.documentElement.setAttribute('data-vsc-theme', themeName);
+    try { localStorage.setItem('vsc_theme', themeName); } catch(e) {}
     if (chrome.runtime && chrome.runtime.sendMessage) {
       chrome.runtime.sendMessage({ action: 'saveSetting', key: 'theme', value: themeName });
     }
@@ -362,6 +365,25 @@ window.VSZhihuUI = {
             nativeCommentBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
             if (nativeCommentBtn.click) nativeCommentBtn.click();
           }
+        }
+      });
+    });
+
+    document.querySelectorAll('.vsc-btn-view-all').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const url = btn.getAttribute('data-question-url') || btn.getAttribute('href');
+
+        const nativeBtn = document.querySelector('.ViewAll, .QuestionMainAction, [class*="ViewAll"]');
+        if (nativeBtn) {
+          try {
+            nativeBtn.click();
+          } catch(err) {}
+        }
+
+        if (url) {
+          const targetUrl = url.startsWith('http') ? url : `https://www.zhihu.com${url}`;
+          window.location.href = targetUrl;
         }
       });
     });

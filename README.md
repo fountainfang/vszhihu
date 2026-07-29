@@ -1,6 +1,6 @@
 # 💻 VSCode Zhihu (知乎 VS Code 皮肤)
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 

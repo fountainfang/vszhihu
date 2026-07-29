@@ -275,11 +275,36 @@ window.VSZhihuParser = {
       });
     });
 
+    let questionId = '';
+    const qMatch = window.location.pathname.match(/question\/(\d+)/);
+    if (qMatch) {
+      questionId = qMatch[1];
+    }
+
+    let viewAllText = '';
+    let viewAllHref = '';
+    const viewAllEl = document.querySelector('.ViewAll, .QuestionMainAction, [class*="ViewAll"], .Question-mainColumn a[href*="/question/"]');
+    if (viewAllEl) {
+      viewAllText = viewAllEl.innerText.replace(/\s+/g, ' ').trim();
+      viewAllHref = viewAllEl.getAttribute('href') || '';
+    }
+
+    if (!viewAllText && (window.location.pathname.includes('/answer/') || questionId)) {
+      viewAllText = '查看全部回答';
+    }
+    if (!viewAllHref && questionId) {
+      viewAllHref = `/question/${questionId}`;
+    }
+
     return {
       type: 'question',
       title: title,
       detail: detailText,
-      answers: answers
+      answers: answers,
+      isSingleAnswer: window.location.pathname.includes('/answer/'),
+      questionId: questionId,
+      questionUrl: viewAllHref || (questionId ? `/question/${questionId}` : ''),
+      viewAllText: viewAllText || '查看全部回答'
     };
   },
 
@@ -287,30 +312,44 @@ window.VSZhihuParser = {
    * Parse Feed / Home Page (`/` or `/follow` or `/recommend`)
    */
   parseFeedPage: function() {
-    const rawItems = Array.from(document.querySelectorAll('.TopstoryItem, .HotItem, .Topstory-recommend .Card'));
-    const items = rawItems.filter(item => !rawItems.some(other => other !== item && other.contains(item)));
+    const candidateNodes = Array.from(document.querySelectorAll(
+      '.TopstoryItem, .HotItem, .Topstory-recommend .Card, .Topstory-follow .Card, .TopstoryMain .Card, [class*="TopstoryItem"], [class*="ContentItem"], .Card, section, [data-za-detail-view-path_module]'
+    ));
+
+    const links = Array.from(document.querySelectorAll('a[href*="/question/"], a[href*="/p/"], a[href*="/zhuanlan/"]'));
+    links.forEach(link => {
+      const card = link.closest('.Card, .TopstoryItem, [class*="Item"], section, div');
+      if (card && !candidateNodes.includes(card)) {
+        candidateNodes.push(card);
+      }
+    });
+
+    const items = candidateNodes.filter(item => !candidateNodes.some(other => other !== item && other.contains(item)));
     const feedList = [];
     const seenUrls = new Set();
 
     items.forEach((item) => {
-      const titleEl = item.querySelector('.QuestionItem-title a, .ContentItem-title a, .HotItem-title, h2 a');
-      const title = titleEl ? titleEl.innerText.trim() : '';
-      let href = titleEl ? titleEl.getAttribute('href') || '' : '';
+      const titleEl = item.querySelector('.ContentItem-title a, .QuestionItem-title a, h2 a, .HotItem-title, a[href*="/question/"], a[href*="/p/"], a[href*="/zhuanlan/"]');
+      if (!titleEl) return;
+
+      const title = titleEl.innerText.trim();
+      let href = titleEl.getAttribute('href') || '';
+
+      if (!title || title.length < 2) return;
 
       if (href.startsWith('//')) href = 'https:' + href;
       else if (href.startsWith('/')) href = 'https://www.zhihu.com' + href;
 
-      const authorEl = item.querySelector('.UserLink-link, .AuthorInfo-name');
-      const author = authorEl ? authorEl.innerText.trim() : '知乎热点';
+      const authorEl = item.querySelector('.UserLink-link, .AuthorInfo-name, [itemprop="name"], .AuthorInfo');
+      const author = authorEl ? authorEl.innerText.replace(/\s+/g, ' ').trim() : '知乎推荐';
 
-      const excerptEl = item.querySelector('.RichText, .HotItem-excerpt, .ContentItem-excerpt');
+      const excerptEl = item.querySelector('.RichText, .ContentItem-excerpt, .HotItem-excerpt, .CopyrightRichText-richText');
       const excerpt = excerptEl ? excerptEl.innerText.trim() : '';
 
-      const metricsEl = item.querySelector('.HotItem-metrics, .ContentItem-actions');
-      const metrics = metricsEl ? metricsEl.innerText.trim() : '';
+      const metricsEl = item.querySelector('.ContentItem-actions, .HotItem-metrics, .ContentItem-meta');
+      const metrics = metricsEl ? metricsEl.innerText.replace(/\s+/g, ' ').trim() : '';
 
-      // Skip duplicate URLs or empty titles
-      if (!title || !href || seenUrls.has(href)) {
+      if (!href || seenUrls.has(href)) {
         return;
       }
       seenUrls.add(href);
@@ -320,7 +359,7 @@ window.VSZhihuParser = {
         title: title,
         href: href,
         author: author,
-        excerpt: excerpt,
+        excerpt: excerpt || title,
         metrics: metrics
       });
     });
@@ -423,6 +462,9 @@ window.VSZhihuParser = {
       code += `<div class="vsc-action-bar">\n`;
       code += `  <button class="vsc-btn-action">▲ 赞同 ${ans.voteCount}</button>\n`;
       code += `  <button class="vsc-btn-action vsc-btn-comment-trigger" data-answer-idx="${idx}" data-answer-id="${ans.answerId}">💬 ${ans.commentCount} 评论/回复区</button>\n`;
+      if (data.isSingleAnswer && data.questionUrl) {
+        code += `  <a href="${data.questionUrl}" class="vsc-btn-action vsc-btn-view-all" data-question-url="${data.questionUrl}">📖 ${escapeHtml(data.viewAllText || '查看全部回答')}</a>\n`;
+      }
       code += `</div>\n`;
       code += `</span>\n\n`;
     });

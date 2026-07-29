@@ -71,6 +71,19 @@ window.VSZhihuCommandPalette = {
         action: () => window.location.href = 'https://www.zhihu.com/hot'
       },
       {
+        id: 'view-all-answers',
+        label: 'Zhihu: View All Answers (查看当前问题的全部回答)',
+        shortcut: '',
+        action: () => {
+          const qMatch = window.location.pathname.match(/question\/(\d+)/);
+          if (qMatch) {
+            window.location.href = `https://www.zhihu.com/question/${qMatch[1]}`;
+          } else {
+            alert('当前页面非知乎问题/回答页面');
+          }
+        }
+      },
+      {
         id: 'theme-dark',
         label: 'Preferences: Color Theme - VS Code Dark+',
         shortcut: '',
