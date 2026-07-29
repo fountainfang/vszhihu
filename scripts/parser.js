@@ -124,6 +124,42 @@ window.VSZhihuParser = {
   },
 
   /**
+   * Extract Answer ID from card element with multi-strategy fallback
+   */
+  extractAnswerId: function(card) {
+    if (!card) return '';
+
+    // 1. Direct name attribute (Zhihu's native AnswerItem container: <div name="12345">)
+    const nameAttr = card.getAttribute('name');
+    if (nameAttr && /^\d{8,20}$/.test(nameAttr)) return nameAttr;
+
+    // 2. Data attributes
+    const dataId = card.dataset?.id || card.dataset?.entryId || card.dataset?.zdContentId || card.dataset?.zopRet;
+    if (dataId && /^\d{8,20}$/.test(dataId)) return dataId;
+
+    // 3. Search links or meta inside card for /answer/ID
+    const links = Array.from(card.querySelectorAll('a[href*="/answer/"], meta[content*="/answer/"], a[href*="/question/"]'));
+    for (const link of links) {
+      const val = link.getAttribute('href') || link.getAttribute('content') || '';
+      const match = val.match(/answer\/(\d{8,20})/);
+      if (match) return match[1];
+    }
+
+    // 4. Regex match on card outerHTML for name=..., answer/..., content_id=...
+    const html = card.outerHTML || '';
+    const match = html.match(/(?:answer\/|Answer-|content_id["\:\s=]+|token["\:\s=]+|itemId["\:\s=]+|name=["\']?|data-id=["\']?)(\d{8,20})/i);
+    if (match) return match[1];
+
+    // 5. Fallback to URL answer ID for answer pages
+    if (window.location.pathname.includes('/answer/')) {
+      const pathMatch = window.location.pathname.match(/answer\/(\d{8,20})/);
+      if (pathMatch) return pathMatch[1];
+    }
+
+    return '';
+  },
+
+  /**
    * Parse Question Page (`/question/123456`)
    */
   parseQuestionPage: function() {
@@ -152,19 +188,8 @@ window.VSZhihuParser = {
       const authorEl = card.querySelector('.AuthorInfo-name .UserLink-link, .AuthorInfo-name, .UserLink-link, [itemprop="name"]');
       const authorName = authorEl ? (authorEl.getAttribute('content') || authorEl.innerText).trim() : '匿名用户';
 
-      // Extract Answer ID for Zhihu Comment API with 100% precision per card
-      let answerId = '';
-      const html = card.outerHTML || '';
-      const idMatch = html.match(/(?:answer\/|token["\:\s]+|content_id["\:\s]+|itemId["\:\s]+|name=["\']|id=["\']Answer-)(\d{10,20})/);
-      if (idMatch) {
-        answerId = idMatch[1];
-      }
-
-      // Fallback to URL answer ID ONLY for the very first card on single-answer pages
-      if (!answerId && answers.length === 0 && window.location.pathname.includes('/answer/')) {
-        const pathMatch = window.location.pathname.match(/answer\/(\d+)/);
-        if (pathMatch) answerId = pathMatch[1];
-      }
+      // Extract Answer ID with multi-strategy helper
+      const answerId = this.extractAnswerId(card);
       
       const badgeEl = card.querySelector('.AuthorInfo-badgeText, .AuthorInfo-detail, .AuthorInfo-badge');
       const badgeText = badgeEl ? badgeEl.innerText.trim() : '';

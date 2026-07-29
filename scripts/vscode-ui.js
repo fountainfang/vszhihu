@@ -344,17 +344,26 @@ window.VSZhihuUI = {
     const self = this;
     document.querySelectorAll('.vsc-btn-comment-trigger, .vsc-code-comment-link').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const idx = parseInt(btn.getAttribute('data-answer-idx'), 10);
+        const idx = parseInt(btn.getAttribute('data-answer-idx'), 10) || 0;
         const btnAnswerId = btn.getAttribute('data-answer-id');
         const targetAns = self.parsedData?.answers?.[idx];
-        const answerId = btnAnswerId || targetAns?.answerId || '';
-
-        self.openCommentTerminal(idx, answerId);
+        let answerId = btnAnswerId || targetAns?.answerId || '';
 
         const mainCol = document.querySelector('.Question-mainColumn, .Question-main') || document;
         const cards = Array.from(mainCol.querySelectorAll('.List-item, .AnswerCard, .AnswerItem, .ContentItem'))
                           .filter(c => !c.closest('.QuestionHeader'));
         const card = cards[idx] || document.querySelector('.AnswerCard, .AnswerItem, .ContentItem');
+
+        if (!answerId && card && window.VSZhihuParser) {
+          answerId = window.VSZhihuParser.extractAnswerId(card);
+        }
+
+        if (!answerId && window.location.pathname.includes('/answer/')) {
+          const pathMatch = window.location.pathname.match(/answer\/(\d{8,20})/);
+          if (pathMatch) answerId = pathMatch[1];
+        }
+
+        self.openCommentTerminal(idx, answerId);
 
         if (card) {
           const btns = Array.from(card.querySelectorAll('button, .Button, [role="button"]'));
