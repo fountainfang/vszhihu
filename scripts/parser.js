@@ -106,6 +106,48 @@ window.VSZhihuParser = {
     const pathMatch = window.location.pathname.match(/p\/(\d+)/);
     if (pathMatch) articleId = pathMatch[1];
 
+    // Parse DOM comments if available on page
+    const commentNodes = Array.from(document.querySelectorAll('.NestComment, .CommentItemV2, .CommentItem, [class*="CommentItem"], [class*="NestComment"]'));
+    const topComments = commentNodes.filter(node => !node.parentElement || !node.parentElement.closest('.NestComment, .CommentItemV2, .CommentItem, [class*="NestComment"], [class*="CommentItem"], [class*="replyList"]'));
+    const comments = [];
+
+    topComments.forEach((cNode, cIdx) => {
+      const cAuthorEl = cNode.querySelector('.UserLink-link, .CommentItem-author, .CommentItemV2-author, a[href*="/people/"], .AuthorInfo-name, [class*="UserLink"]');
+      const cAuthor = cAuthorEl ? cAuthorEl.innerText.trim() : '知乎用户';
+      
+      const cTextEl = cNode.querySelector('.CommentItem-content, .CommentItemV2-content, .CommentItem-text, .RichText, [class*="content"]');
+      const cText = cTextEl ? cTextEl.innerText.trim() : '';
+
+      const cLikeEl = cNode.querySelector('.Button--like, .CommentItem-likeCount, [class*="like"]');
+      const cLikes = cLikeEl ? cLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
+
+      const replyNodes = cNode.querySelectorAll('.NestComment-children [class*="CommentItem"], .CommentItem-reply, .CommentItemV2-replyList [class*="CommentItemV2"], [class*="replyList"] [class*="CommentItem"]');
+      const replies = [];
+
+      replyNodes.forEach((rNode, rIdx) => {
+        const rAuthorEl = rNode.querySelector('.UserLink-link, .CommentItem-author, .CommentItemV2-author, a[href*="/people/"]');
+        const rAuthor = rAuthorEl ? rAuthorEl.innerText.trim() : '回复者';
+
+        const rTextEl = rNode.querySelector('.CommentItem-content, .CommentItemV2-content, .RichText');
+        const rText = rTextEl ? rTextEl.innerText.trim() : '';
+
+        const rLikeEl = rNode.querySelector('.Button--like, [class*="like"]');
+        const rLikes = rLikeEl ? rLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
+
+        if (rText && rText !== cText) {
+          replies.push({ id: `1_${cIdx + 1}_sub_${rIdx + 1}`, author: rAuthor, text: rText, likes: rLikes });
+        }
+      });
+
+      if (cText) {
+        comments.push({ id: `1_${cIdx + 1}`, author: cAuthor, text: cText, likes: cLikes, replies: replies });
+      }
+    });
+
+    if (comments.length > 0 && commentCount === '0') {
+      commentCount = String(comments.length);
+    }
+
     return {
       type: 'article',
       title: title,
@@ -118,7 +160,7 @@ window.VSZhihuParser = {
         commentCount: commentCount,
         contentHtml: contentHtml,
         contentText: contentText,
-        comments: []
+        comments: comments
       }]
     };
   },
@@ -500,9 +542,13 @@ window.VSZhihuParser = {
 
 function escapeHtml(str) {
   if (!str) return '';
-  return str.replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+  return String(str).replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+}
+
+if (typeof window !== 'undefined') {
+  window.escapeHtml = escapeHtml;
 }

@@ -46,4 +46,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return true;
   }
+
+  if (request.action === 'fetchUrl') {
+    fetch(request.url, {
+      headers: {
+        'Accept': 'application/json, text/plain, */*'
+      },
+      credentials: 'include'
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(data => sendResponse({ success: true, data: data }))
+      .catch(err => sendResponse({ success: false, error: err.toString() }));
+    return true;
+  }
 });

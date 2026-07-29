@@ -1,14 +1,95 @@
-/**
- * VSCode Zhihu - Main UI Controller
- * Builds and renders the full VS Code application environment over Zhihu pages.
- */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+}
 
 window.VSZhihuUI = {
   theme: 'dark-plus',
   codeViewMode: 'code', // 'code' or 'rich'
   bossKeyActive: false,
   activeTab: 'main',
-  tabs: [],
+  fetchApi: function(url) {
+    // 1. Convert to relative URL ONLY if origins match, to avoid cross-subdomain 404s (e.g. zhuanlan vs www)
+    let fetchUrl = url;
+    try {
+      const parsedUrl = new URL(url, window.location.href);
+      if (parsedUrl.origin === window.location.origin) {
+        fetchUrl = parsedUrl.pathname + parsedUrl.search;
+      }
+    } catch(e) {}
+
+    return fetch(fetchUrl, { headers: { 'Accept': 'application/json' }, credentials: 'include' })
+      .then(res => {
+        if (!res.ok) throw new Error('HTTP status ' + res.status);
+        return res.json();
+      })
+      .catch(err => {
+        // 2. Fallback to Service Worker proxy fetch (bypasses CORS & subdomain restrictions)
+        return new Promise((resolve, reject) => {
+          try {
+            chrome.runtime.sendMessage({ action: 'fetchUrl', url: url }, (res) => {
+              if (chrome.runtime.lastError || !res || !res.success) {
+                reject(new Error(res?.error || chrome.runtime.lastError?.message || 'Fetch failed'));
+              } else {
+                resolve(res.data);
+              }
+            });
+          } catch(e) {
+            reject(e);
+          }
+        });
+      });
+  },
+
+  fetchCommentThread: function(category, targetId, offset = 0) {
+    let urls = [];
+    if (category === 'articles' || category === 'posts') {
+      urls = [
+        `https://zhuanlan.zhihu.com/api/posts/${targetId}/root_comments?limit=20&offset=${offset}&order=normal`,
+        `https://www.zhihu.com/api/v4/comment_v5/articles/${targetId}/root_comments?limit=20&offset=${offset}&order=normal`,
+        `https://www.zhihu.com/api/v4/comment_v5/answers/${targetId}/root_comments?limit=20&offset=${offset}&order=normal`,
+        `https://www.zhihu.com/api/v4/comment_v5/posts/${targetId}/root_comments?limit=20&offset=${offset}&order=normal`,
+        `https://www.zhihu.com/api/v4/articles/${targetId}/root_comments?limit=20&offset=${offset}&order=normal`
+      ];
+    } else {
+      urls = [
+        `https://www.zhihu.com/api/v4/comment_v5/answers/${targetId}/root_comments?limit=20&offset=${offset}&order=normal`,
+        `https://www.zhihu.com/api/v4/answers/${targetId}/root_comments?limit=20&offset=${offset}&order=normal`
+      ];
+    }
+
+    const self = this;
+    const tryNext = (index) => {
+      if (index >= urls.length) {
+        return Promise.reject(new Error('All comment API endpoints failed'));
+      }
+      return self.fetchApi(urls[index]).catch(() => {
+        return tryNext(index + 1);
+      });
+    };
+
+    return tryNext(0);
+  },
+
+  fetchSubCommentThread: function(commentId, offset = 0) {
+    const urls = [
+      `https://www.zhihu.com/api/v4/comment_v5/comments/${commentId}/child_comments?limit=20&offset=${offset}`,
+      `https://www.zhihu.com/api/v4/comments/${commentId}/child_comments?limit=20&offset=${offset}`,
+      `https://zhuanlan.zhihu.com/api/comments/${commentId}/child_comments?limit=20&offset=${offset}`
+    ];
+    const self = this;
+    const tryNext = (index) => {
+      if (index >= urls.length) {
+        return Promise.reject(new Error('All sub-comment API endpoints failed'));
+      }
+      return self.fetchApi(urls[index]).catch(() => tryNext(index + 1));
+    };
+    return tryNext(0);
+  },
 
   init: function(settings, parsedData) {
     this.theme = settings.theme || 'dark-plus';
@@ -339,9 +420,9 @@ window.VSZhihuUI = {
         let answerId = btnAnswerId || targetAns?.answerId || '';
 
         const mainCol = document.querySelector('.Question-mainColumn, .Question-main') || document;
-        const cards = Array.from(mainCol.querySelectorAll('.List-item, .AnswerCard, .AnswerItem, .ContentItem'))
+        const cards = Array.from(mainCol.querySelectorAll('.List-item, .AnswerCard, .AnswerItem, .ContentItem, .Post-Main, .ArticleItem, .Post-RichTextContainer, article'))
                           .filter(c => !c.closest('.QuestionHeader'));
-        const card = cards[idx] || document.querySelector('.AnswerCard, .AnswerItem, .ContentItem');
+        const card = cards[idx] || document.querySelector('.AnswerCard, .AnswerItem, .ContentItem, .Post-Main, .ArticleItem, .Post-RichTextContainer, article');
 
         if (!answerId && card && window.VSZhihuParser) {
           answerId = window.VSZhihuParser.extractAnswerId(card);
@@ -351,20 +432,27 @@ window.VSZhihuUI = {
           const pathMatch = window.location.pathname.match(/answer\/(\d{8,20})/);
           if (pathMatch) answerId = pathMatch[1];
         }
+        if (!answerId && window.location.pathname.includes('/p/')) {
+          const pathMatch = window.location.pathname.match(/p\/(\d{8,20})/);
+          if (pathMatch) answerId = pathMatch[1];
+        }
 
         self.openCommentTerminal(idx, answerId);
 
-        if (card) {
-          const btns = Array.from(card.querySelectorAll('button, .Button, [role="button"]'));
-          const nativeCommentBtn = btns.find(b => b.innerText.includes('评论')) || card.querySelector('.Button--comment');
-          if (nativeCommentBtn) {
-            try {
-              nativeCommentBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-              nativeCommentBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
-              nativeCommentBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-              if (nativeCommentBtn.click) nativeCommentBtn.click();
-            } catch(err) {}
-          }
+        const searchContainer = card || document;
+        const btns = Array.from(searchContainer.querySelectorAll('button, .Button, [role="button"], a[class*="comment"], div[class*="comment"]'));
+        const nativeCommentBtn = btns.find(b => {
+          const txt = (b.innerText || b.textContent || '').trim();
+          return txt.includes('评论') || txt.includes('条评论');
+        }) || document.querySelector('.Button--comment, [class*="CommentButton"], [class*="comment-button"]');
+
+        if (nativeCommentBtn) {
+          try {
+            nativeCommentBtn.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+            nativeCommentBtn.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+            nativeCommentBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+            if (nativeCommentBtn.click) nativeCommentBtn.click();
+          } catch(err) {}
         }
         return;
       }
@@ -381,9 +469,7 @@ window.VSZhihuUI = {
 
         expandSubBtn.innerText = '⏳ 正在加载回复...';
 
-        const subApiUrl = `https://www.zhihu.com/api/v4/comments/${commentId}/child_comments?limit=20&offset=${offset}`;
-        fetch(subApiUrl)
-          .then(res => res.json())
+        self.fetchSubCommentThread(commentId, offset)
           .then(subJson => {
             if (subJson.data && subJson.data.length > 0) {
               const listEl = document.getElementById(`vsc-sub-list-${commentId}`);
@@ -437,10 +523,7 @@ window.VSZhihuUI = {
         moreRootBtn.innerText = '⏳ 正在加载更多评论...';
         moreRootBtn.disabled = true;
 
-        const nextApiUrl = `https://www.zhihu.com/api/v4/${apiCategory}/${answerId}/root_comments?limit=20&offset=${offset}&order=normal`;
-
-        fetch(nextApiUrl)
-          .then(res => res.json())
+        self.fetchCommentThread(apiCategory, answerId, offset)
           .then(json => {
             moreRootBtn.disabled = false;
             if (json.data && json.data.length > 0) {
@@ -603,7 +686,7 @@ window.VSZhihuUI = {
 
     const isArticle = this.parsedData?.type === 'article' || window.location.pathname.includes('/p/');
     const apiCategory = isArticle ? 'articles' : 'answers';
-    const apiUrl = `https://www.zhihu.com/api/v4/${apiCategory}/${targetAnswerId}/root_comments?limit=20&offset=0&order=normal`;
+    const apiUrl = `https://www.zhihu.com/api/v4/comment_v5/${apiCategory}/${targetAnswerId}/root_comments?limit=20&offset=0&order=normal`;
 
     panel.innerHTML = `
       <div class="vsc-panel-header">
@@ -628,26 +711,25 @@ window.VSZhihuUI = {
     `;
 
     if (targetAnswerId) {
-      fetch(apiUrl)
-        .then(res => res.json())
+      this.fetchCommentThread(apiCategory, targetAnswerId, 0)
         .then(json => {
           const container = document.getElementById('vsc-term-comments-list');
           const termBox = document.getElementById('vsc-term-comments');
           if (!container) return;
 
           if (!json.data || json.data.length === 0) {
-            container.innerHTML = `<div style="color: var(--vsc-syn-string); font-style: italic;">// 该回答暂无评论或已关闭评论区</div>`;
+            container.innerHTML = `<div style="color: var(--vsc-syn-string); font-style: italic;">// 该回答/文章暂无评论或已关闭评论区</div>`;
             return;
           }
 
           let html = `<div style="color: var(--vsc-syn-comment); margin-bottom: 12px;">// Successfully loaded ${json.data.length} root comment threads (Total: ${json.paging?.totals || json.data.length})</div>`;
           
           json.data.forEach((item) => {
-            const author = item.author?.member?.name || '匿名用户';
+            const author = item.author?.member?.name || item.author?.name || '匿名用户';
             const content = item.content ? item.content.replace(/<[^>]+>/g, '') : '';
-            const likes = item.vote_count || 0;
+            const likes = item.vote_count || item.likes_count || item.like_count || 0;
             const time = item.created_time ? new Date(item.created_time * 1000).toLocaleString() : '';
-            const childCount = item.child_comment_count || 0;
+            const childCount = item.child_comment_count || item.child_comments_count || 0;
             const initialChildren = item.child_comments || [];
 
             html += `<div class="vsc-comment-card" id="vsc-cmt-${item.id}">`;
@@ -659,10 +741,10 @@ window.VSZhihuUI = {
             html += `  <div class="vsc-comment-sub-list" id="vsc-sub-list-${item.id}">`;
 
             initialChildren.forEach((sub) => {
-              const subAuthor = sub.author?.member?.name || '回复者';
-              const replyTo = sub.reply_to_author?.member?.name || author;
+              const subAuthor = sub.author?.member?.name || sub.author?.name || '回复者';
+              const replyTo = sub.reply_to_author?.member?.name || sub.reply_to_author?.name || author;
               const subContent = sub.content ? sub.content.replace(/<[^>]+>/g, '') : '';
-              const subLikes = sub.vote_count || 0;
+              const subLikes = sub.vote_count || sub.likes_count || sub.like_count || 0;
 
               html += `  <div class="vsc-comment-sub">`;
               html += `    <div style="color: var(--vsc-syn-keyword); font-weight: 500;">└─ @${subAuthor} <span style="color: var(--vsc-fg-muted);">回复</span> @${replyTo} <span style="color: var(--vsc-syn-number); float: right;">▲ ${subLikes}</span></div>`;
@@ -699,8 +781,7 @@ window.VSZhihuUI = {
             termBox?.insertAdjacentHTML('beforeend', moreHtml);
           }
         })
-        .catch(err => {
-          console.error('[VSCode-Zhihu] API fetch error:', err);
+        .catch(() => {
           this.renderFallbackDomComments(answerIdx);
         });
     } else {
@@ -708,18 +789,75 @@ window.VSZhihuUI = {
     }
   },
 
-  renderFallbackDomComments: function(answerIdx) {
+  renderFallbackDomComments: function(answerIdx, retryCount = 0) {
     const container = document.getElementById('vsc-term-comments');
     if (!container) return;
 
     const targetAns = this.parsedData?.answers?.[answerIdx];
-    if (targetAns && targetAns.comments && targetAns.comments.length > 0) {
-      let html = `<div style="color: var(--vsc-syn-comment);">// Loaded ${targetAns.comments.length} comments from DOM tree</div>`;
-      targetAns.comments.forEach(cmt => {
+    let comments = (targetAns && targetAns.comments && targetAns.comments.length > 0) ? targetAns.comments : [];
+
+    // If initial parse had no comments, dynamically extract from current DOM tree
+    if (comments.length === 0) {
+      const commentNodes = Array.from(document.querySelectorAll(
+        '.NestComment, .CommentItemV2, .CommentItem, ' +
+        '[class*="NestComment"], [class*="CommentItem"], [class*="commentItem"], ' +
+        '.Comments-container [role="listitem"], .CommentsV2 [role="listitem"]'
+      ));
+
+      const topComments = commentNodes.filter(node => 
+        !node.parentElement || !node.parentElement.closest('.NestComment, .CommentItemV2, .CommentItem, [class*="NestComment"], [class*="CommentItem"], [class*="replyList"], [class*="subList"]')
+      );
+      const domComments = [];
+
+      topComments.forEach((cNode, cIdx) => {
+        const cAuthorEl = cNode.querySelector('.UserLink-link, .CommentItem-author, .CommentItemV2-author, a[href*="/people/"], .AuthorInfo-name, [class*="UserLink"], [class*="author"]');
+        const cAuthor = cAuthorEl ? cAuthorEl.innerText.trim() : '知乎用户';
+        
+        const cTextEl = cNode.querySelector('.CommentItem-content, .CommentItemV2-content, .CommentItem-text, .RichText, [class*="content"], [class*="text"]');
+        const cText = cTextEl ? cTextEl.innerText.trim() : '';
+
+        const cLikeEl = cNode.querySelector('.Button--like, .CommentItem-likeCount, [class*="like"], [class*="vote"]');
+        const cLikes = cLikeEl ? cLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
+
+        const replyNodes = cNode.querySelectorAll(
+          '.NestComment-children [class*="CommentItem"], .CommentItem-reply, ' +
+          '.CommentItemV2-replyList [class*="CommentItemV2"], [class*="replyList"] [class*="CommentItem"], ' +
+          '[class*="children"] [class*="CommentItem"], [class*="subList"] [class*="CommentItem"]'
+        );
+        const replies = [];
+
+        replyNodes.forEach((rNode, rIdx) => {
+          const rAuthorEl = rNode.querySelector('.UserLink-link, .CommentItem-author, .CommentItemV2-author, a[href*="/people/"], [class*="UserLink"], [class*="author"]');
+          const rAuthor = rAuthorEl ? rAuthorEl.innerText.trim() : '回复者';
+
+          const rTextEl = rNode.querySelector('.CommentItem-content, .CommentItemV2-content, .RichText, [class*="content"], [class*="text"]');
+          const rText = rTextEl ? rTextEl.innerText.trim() : '';
+
+          const rLikeEl = rNode.querySelector('.Button--like, [class*="like"], [class*="vote"]');
+          const rLikes = rLikeEl ? rLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
+
+          if (rText && rText !== cText) {
+            replies.push({ author: rAuthor, text: rText, likes: rLikes });
+          }
+        });
+
+        if (cText) {
+          domComments.push({ author: cAuthor, text: cText, likes: cLikes, replies: replies });
+        }
+      });
+
+      if (domComments.length > 0) {
+        comments = domComments;
+      }
+    }
+
+    if (comments.length > 0) {
+      let html = `<div style="color: var(--vsc-syn-comment);">// Loaded ${comments.length} comments from DOM tree</div>`;
+      comments.forEach(cmt => {
         html += `<div class="vsc-comment-card">`;
-        html += `  <div class="vsc-comment-header"><span>@${cmt.author}</span><span>▲ ${cmt.likes}</span></div>`;
-        html += `  <div>${cmt.text}</div>`;
-        if (cmt.replies) {
+        html += `  <div class="vsc-comment-header"><span>@${cmt.author}</span><span>▲ ${cmt.likes || 0}</span></div>`;
+        html += `  <div style="padding-left: 12px;">${cmt.text}</div>`;
+        if (cmt.replies && cmt.replies.length > 0) {
           cmt.replies.forEach(r => {
             html += `<div class="vsc-comment-sub"><div>@${r.author}: ${r.text}</div></div>`;
           });
@@ -728,7 +866,14 @@ window.VSZhihuUI = {
       });
       container.innerHTML = html;
     } else {
-      container.innerHTML = `<div style="color: var(--vsc-syn-string);">// 正在唤醒知乎接口... 请点击下方按钮或再次重试</div>`;
+      container.innerHTML = `<div style="color: var(--vsc-syn-string); font-style: italic;">// 正在唤醒知乎原生评论组件... (${retryCount + 1}/4)</div>`;
+      if (retryCount < 3) {
+        setTimeout(() => {
+          this.renderFallbackDomComments(answerIdx, retryCount + 1);
+        }, 800 * (retryCount + 1));
+      } else {
+        container.innerHTML = `<div style="color: var(--vsc-syn-string); font-style: italic;">// 该文章/回答暂无评论或处于关闭状态。若包含评论，请点击界面原生评论按钮展开。</div>`;
+      }
     }
   },
 
