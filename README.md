@@ -1,6 +1,6 @@
 # 💻 VSCode Zhihu (知乎 VS Code 皮肤)
 
-![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)
 ![Manifest](https://img.shields.io/badge/Manifest-V3-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
@@ -12,12 +12,18 @@
 
 ## ✨ 核心特性
 
-- 🎨 **VS Code 经典 IDE 布局**：完整还原左侧 Activity Bar（活动栏）、Sidebar Explorer（文件树）、多标签页（Tab Bar）、代码行号（Line Numbers）及底部 Status Bar（状态栏）。
-- 📝 **代码化内容渲染**：知乎首页推荐、全网热榜、问题回答及专栏文章均被智能格式化为结构优雅的 TypeScript / JSON 代码块。
+- 🎨 **VS Code 经典 IDE 布局**：完整还原左侧 Activity Bar（活动栏）、Sidebar Explorer（文件树）、内置多标签页（Tab Bar）、代码行号（Line Numbers）及底部 Status Bar（状态栏）。
+- 🥷 **极致伪装与纯代码 Title (Stealth Mode & Code Titles)**：
+  - 浏览器 Tab 页标题及内置标签页文件名**全量转换为纯 ASCII 代码文件名**（如 `question_20556808.ts`、`article_20659198.ts`、`recommend.ts`），**绝不出任何中文字样**。
+  - 双重 `MutationObserver` 结合定时锁定机制，强力锁定官方 VS Code Favicon 及网页 Title，彻底拦截知乎 SPA/WebSocket 异步消息对标题的篡改。
+- 📝 **代码化内容渲染与 CSS 干净清洗**：
+  - 知乎首页推荐、全网热榜、问题回答及专栏文章均被智能格式化为结构优雅的 TypeScript / JSON 代码块。
+  - 全量剥离知乎 Emotion / Styled-components 的内嵌 `<style>` 标签与 `.css-1od93p9{...}` 样式声明，输出零噪点干净正文。
+- 🔄 **API 级动态无限滚动 (Answer Stream Pagination)**：
+  - 滚动到底部时自动通过知乎 API 动态分页拉取后续回答（包含完整正文），解决知乎 SSR 初始只包含 2 条回答的问题。
 - 💬 **VS Code 终端评论面板 (Terminal Comments Panel)**：
-  - 点击评论自动唤起底部的 VS Code 终端面板，实时执行 `zhihu-cli comments` 命令。
-  - 直连知乎官方 API 实时拉取最新评论与二级嵌套回复（`nestedReplies`），以树状 ASCII 日志形式清晰展现。
-- 🙈 **一键摸鱼老板键 (Stealth Mode)**：
+  - 点击评论自动唤起底部的 VS Code 终端面板，支持二级嵌套回复（`nestedReplies`）展开，并具备 DOM 重绘持久化保障，不会闪退或被覆盖。
+- 🙈 **一键摸鱼老板键 (Stealth Boss Key)**：
   - 按下 <kbd>Alt</kbd> + <kbd>V</kbd>（或 <kbd>Option</kbd> + <kbd>V</kbd>）瞬间将屏幕伪装为 100% 逼真的现代 C++ 线程池源码。
 - ⚡ **命令面板 (Command Palette)**：
   - 按下 <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> 或 <kbd>F1</kbd> 唤起命令面板，支持模糊搜索知乎问题、快速跳转路由及切换主题。
@@ -25,8 +31,7 @@
   - **VS Code Dark+**（默认暗黑主题）
   - **One Dark Pro**
   - **Monokai**
-  - **Light Modern**（亮色浅色模式）
-- 🔄 **无感无限滚动 (Infinite Scroll)**：向下滑动到底部自动同步加载下一页回答与推荐 Feed，滚动位置平滑保持不跳动。
+  - **Light Modern**（浅色亮色模式）
 
 ---
 
@@ -57,7 +62,7 @@
 | :--- | :--- |
 | <kbd>Alt</kbd> + <kbd>V</kbd> (或 <kbd>Option</kbd> + <kbd>V</kbd>) | **摸鱼老板键**：瞬间切换/退出伪装 C++ 源码 |
 | <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>P</kbd> / <kbd>F1</kbd> | **命令面板**：搜索知乎、切换主题、跳转路由 |
-| **点击代码内的 URL / 标题** | **代码跳转**：直接在 VS Code 界面中打开该问题/文章 |
+| **点击代码内的 URL / 标题** | **内置新标签页打开**：直接在 VS Code 标签页中加载渲染 |
 | **点击 `💬 XX 评论`** | **终端评论**：唤起底部 Terminal 面板查看评论及回复 |
 
 ---
@@ -66,7 +71,7 @@
 
 ```text
 vszhihu/
-├── manifest.json         # Manifest V3 扩展配置文件
+├── manifest.json         # Manifest V3 扩展配置文件 (v1.0.3)
 ├── background.js          # 后台 Service Worker
 ├── content.js             # Content Script 入口脚本
 ├── README.md              # 项目说明文档
@@ -74,9 +79,9 @@ vszhihu/
 │   ├── vscode.css         # VS Code 界面主布局与组件样式
 │   └── themes.css         # 颜色主题定义 (Dark+, One Dark, Monokai, Light)
 ├── scripts/
-│   ├── preload.js         # document_start 零闪烁预加载脚本
-│   ├── parser.js          # 知乎 DOM 解析与 TypeScript 代码格式化引擎
-│   ├── vscode-ui.js       # VS Code UI 渲染引擎与 Terminal 评论面板逻辑
+│   ├── preload.js         # document_start 零闪烁预加载脚本与标题/图标锁
+│   ├── parser.js          # 知乎 DOM 解析、CSS 噪声清洗与 TypeScript 格式化引擎
+│   ├── vscode-ui.js       # VS Code UI 渲染引擎、API 触底分页与 Terminal 评论面板
 │   └── command-palette.js # Cmd+Shift+P 命令面板模块
 ├── popup/                 # 扩展控制弹窗 UI
 │   ├── popup.html
