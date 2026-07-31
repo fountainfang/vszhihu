@@ -5,6 +5,7 @@
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 [![GitHub stars](https://img.shields.io/github/stars/fountainfang/vszhihu?style=social)](https://github.com/fountainfang/vszhihu)
 
+[![Star History Chart](https://api.star-history.com/svg?repos=fountainfang/vszhihu\&type=Date)](https://star-history.com/#fountainfang/vszhihu&Date)
 **VSCode Zhihu** 是一款突破性的 Chrome / Edge 浏览器插件，能将知乎（zhihu.com）全量重构为现代化的 **VS Code 编辑器界面**。
 
 无论是在办公室摸鱼、学习技术，还是享受沉浸式的代码化阅读体验，VSCode Zhihu 都能让您以极致优雅的开发者视角浏览知乎！
