@@ -186,7 +186,7 @@ html.vsc-enabled body > *:not(#vsc-app-root):not(#vsc-boss-screen):not(#vsc-cmd-
   color: var(--vsc-fg);
 }
 
-.vsc-tree-item {
+.vsc-tree-item, .vsc-open-editor-item {
   padding: 4px 12px 4px 24px;
   font-size: 13px;
   color: var(--vsc-fg);
@@ -199,11 +199,11 @@ html.vsc-enabled body > *:not(#vsc-app-root):not(#vsc-boss-screen):not(#vsc-cmd-
   overflow: hidden;
 }
 
-.vsc-tree-item:hover {
+.vsc-tree-item:hover, .vsc-open-editor-item:hover {
   background-color: var(--vsc-bg-hover);
 }
 
-.vsc-tree-item.active {
+.vsc-tree-item.active, .vsc-open-editor-item.active {
   background-color: var(--vsc-bg-selection);
   color: #ffffff;
 }
@@ -264,6 +264,7 @@ html.vsc-enabled body > *:not(#vsc-app-root):not(#vsc-boss-screen):not(#vsc-cmd-
   max-width: 220px;
   min-width: 120px;
   position: relative;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .vsc-tab:hover {
@@ -285,19 +286,22 @@ html.vsc-enabled body > *:not(#vsc-app-root):not(#vsc-boss-screen):not(#vsc-cmd-
 }
 
 .vsc-tab-close {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 13px;
   opacity: 0.6;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  margin-left: 4px;
 }
 
 .vsc-tab-close:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: var(--vsc-bg-hover, rgba(128, 128, 128, 0.3));
   opacity: 1;
+  color: var(--vsc-fg);
 }
 
 /* Breadcrumbs */

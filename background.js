@@ -50,16 +50,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'fetchUrl') {
     fetch(request.url, {
       headers: {
-        'Accept': 'application/json, text/plain, */*'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       },
       credentials: 'include'
     })
       .then(res => {
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
+        return res.text();
       })
       .then(data => sendResponse({ success: true, data: data }))
       .catch(err => sendResponse({ success: false, error: err.toString() }));
-    return true;
+    return true; // Keep channel open for async response
   }
 });

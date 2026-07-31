@@ -116,6 +116,12 @@
       if (hasContent) {
         if (window.VSZhihuUI) {
           window.VSZhihuUI.parsedData = refreshedData;
+          const mainTab = window.VSZhihuUI.tabs?.find(t => t.id === 'tab-main');
+          if (mainTab) {
+            mainTab.parsedData = refreshedData;
+            mainTab.formattedCode = window.VSZhihuParser ? window.VSZhihuParser.formatAsTypeScript(refreshedData) : '';
+            mainTab.title = window.VSZhihuParser ? window.VSZhihuParser.getFileName(refreshedData, mainTab.url) : mainTab.title;
+          }
           window.VSZhihuUI.createAppRoot();
         }
         clearInterval(retryInterval);
@@ -137,6 +143,12 @@
           data = parseCurrentPage();
           if (window.VSZhihuUI) {
             window.VSZhihuUI.parsedData = data;
+            const mainTab = window.VSZhihuUI.tabs?.find(t => t.id === 'tab-main');
+            if (mainTab) {
+              mainTab.parsedData = data;
+              mainTab.formattedCode = window.VSZhihuParser ? window.VSZhihuParser.formatAsTypeScript(data) : '';
+              mainTab.title = window.VSZhihuParser ? window.VSZhihuParser.getFileName(data, mainTab.url) : mainTab.title;
+            }
             window.VSZhihuUI.createAppRoot();
           }
           return;
@@ -149,6 +161,12 @@
 
         if (newData && itemCountChanged && window.VSZhihuUI) {
           window.VSZhihuUI.parsedData = newData;
+          const mainTab = window.VSZhihuUI.tabs?.find(t => t.id === 'tab-main');
+          if (mainTab) {
+            mainTab.parsedData = newData;
+            mainTab.formattedCode = window.VSZhihuParser ? window.VSZhihuParser.formatAsTypeScript(newData) : '';
+            mainTab.title = window.VSZhihuParser ? window.VSZhihuParser.getFileName(newData, mainTab.url) : mainTab.title;
+          }
           window.VSZhihuUI.createAppRoot();
         }
       }, 250);

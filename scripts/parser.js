@@ -7,8 +7,14 @@ window.VSZhihuParser = {
   /**
    * Detect current page type
    */
-  getPageType: function() {
-    const path = window.location.pathname;
+  getPageType: function(doc = (typeof document !== 'undefined' ? document : null), url = (typeof window !== 'undefined' ? window.location.href : '')) {
+    let path = url || (typeof window !== 'undefined' ? window.location.pathname : '');
+    try {
+      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+        path = new URL(url).pathname;
+      }
+    } catch(e) {}
+
     if (path.includes('/hot')) {
       return 'hot';
     }
@@ -33,39 +39,75 @@ window.VSZhihuParser = {
   /**
    * Parse Hot Rank Page (`/hot`)
    */
-  parseHotPage: function() {
-    const items = document.querySelectorAll('.HotList-list section, section.HotItem, .HotItem, [aria-label*="热榜"] section, .Card .HotItem-content');
+  parseHotPage: function(doc = (typeof document !== 'undefined' ? document : null)) {
+    const targetDoc = doc || document;
+    const items = targetDoc.querySelectorAll('.HotList-list section, section.HotItem, .HotItem, [aria-label*="热榜"] section, .Card .HotItem-content');
     const feedList = [];
 
-    items.forEach((item, idx) => {
-      const titleEl = item.querySelector('.HotItem-title, h2, a[href*="/question/"]');
-      const title = titleEl ? titleEl.innerText.trim() : '';
+    if (items.length === 0) {
+      const initialDataEl = targetDoc.getElementById('js-initialData');
+      if (initialDataEl && initialDataEl.textContent) {
+        try {
+          const json = JSON.parse(initialDataEl.textContent);
+          const hotList = json?.initialState?.topstory?.hotList || json?.initialState?.entities?.hotList;
+          if (Array.isArray(hotList)) {
+            hotList.forEach((item, idx) => {
+              const target = item.target || item;
+              const title = target.titleArea?.text || target.title || '';
+              let href = target.link?.url || target.url || '';
+              if (href.startsWith('//')) href = 'https:' + href;
+              else if (href.startsWith('/')) href = 'https://www.zhihu.com' + href;
 
-      const linkEl = item.querySelector('a[href*="/question/"], a.HotItem-content, a[href*="zhihu.com"]') || titleEl;
-      let href = linkEl ? linkEl.getAttribute('href') || '' : '';
-      if (href.startsWith('//')) href = 'https:' + href;
-      else if (href.startsWith('/')) href = 'https://www.zhihu.com' + href;
+              const excerpt = target.excerptArea?.text || target.excerpt || '';
+              const metrics = target.metricsArea?.text || '🔥 热度飙升';
 
-      const rankEl = item.querySelector('.HotItem-index, .HotItem-rank');
-      const rank = rankEl ? rankEl.innerText.trim() : `${idx + 1}`;
-
-      const excerptEl = item.querySelector('.HotItem-excerpt, .HotItem-content p, .HotItem-detail');
-      const excerpt = excerptEl ? excerptEl.innerText.trim() : '';
-
-      const metricsEl = item.querySelector('.HotItem-metrics, .HotItem-metricsText');
-      const metrics = metricsEl ? metricsEl.innerText.trim() : '🔥 热度飙升';
-
-      if (title) {
-        feedList.push({
-          id: rank || (idx + 1),
-          title: title,
-          href: href || 'javascript:void(0);',
-          author: `Rank #${rank || (idx + 1)} · ${metrics}`,
-          excerpt: excerpt || title,
-          metrics: metrics
-        });
+              if (title) {
+                feedList.push({
+                  id: idx + 1,
+                  title: title,
+                  href: href || 'javascript:void(0);',
+                  author: `Rank #${idx + 1} · ${metrics}`,
+                  excerpt: excerpt || title,
+                  metrics: metrics
+                });
+              }
+            });
+          }
+        } catch(e) {}
       }
-    });
+    }
+
+    if (feedList.length === 0) {
+      items.forEach((item, idx) => {
+        const titleEl = item.querySelector('.HotItem-title, h2, a[href*="/question/"]');
+        const title = titleEl ? titleEl.innerText.trim() : '';
+
+        const linkEl = item.querySelector('a[href*="/question/"], a.HotItem-content, a[href*="zhihu.com"]') || titleEl;
+        let href = linkEl ? linkEl.getAttribute('href') || '' : '';
+        if (href.startsWith('//')) href = 'https:' + href;
+        else if (href.startsWith('/')) href = 'https://www.zhihu.com' + href;
+
+        const rankEl = item.querySelector('.HotItem-index, .HotItem-rank');
+        const rank = rankEl ? rankEl.innerText.trim() : `${idx + 1}`;
+
+        const excerptEl = item.querySelector('.HotItem-excerpt, .HotItem-content p, .HotItem-detail');
+        const excerpt = excerptEl ? excerptEl.innerText.trim() : '';
+
+        const metricsEl = item.querySelector('.HotItem-metrics, .HotItem-metricsText');
+        const metrics = metricsEl ? metricsEl.innerText.trim() : '🔥 热度飙升';
+
+        if (title) {
+          feedList.push({
+            id: rank || (idx + 1),
+            title: title,
+            href: href || 'javascript:void(0);',
+            author: `Rank #${rank || (idx + 1)} · ${metrics}`,
+            excerpt: excerpt || title,
+            metrics: metrics
+          });
+        }
+      });
+    }
 
     return {
       type: 'hot',
@@ -74,13 +116,14 @@ window.VSZhihuParser = {
     };
   },
 
-  extractCommentsFromInitialData: function() {
+  extractCommentsFromInitialData: function(doc = (typeof document !== 'undefined' ? document : null)) {
     try {
-      const el = document.getElementById('js-initialData');
+      const targetDoc = doc || document;
+      const el = targetDoc.getElementById('js-initialData');
       let data = null;
       if (el && el.textContent) {
         data = JSON.parse(el.textContent);
-      } else if (window.__INITIAL_STATE__) {
+      } else if (typeof window !== 'undefined' && window.__INITIAL_STATE__) {
         data = window.__INITIAL_STATE__;
       }
 
@@ -138,41 +181,59 @@ window.VSZhihuParser = {
   /**
    * Parse Article Page (`/p/123456` or `/zhuanlan/`)
    */
-  parseArticlePage: function() {
-    const titleEl = document.querySelector('h1.Post-Title, .Post-Header h1, .ArticleItem-title, h1');
-    const title = titleEl ? titleEl.innerText.trim() : document.title.replace('- 知乎', '').trim();
+  parseArticlePage: function(doc = (typeof document !== 'undefined' ? document : null), url = '') {
+    const targetDoc = doc || document;
+    const titleEl = targetDoc.querySelector('h1.Post-Title, .Post-Header h1, .ArticleItem-title, h1');
+    let title = titleEl ? titleEl.innerText.trim() : (targetDoc.title ? targetDoc.title.replace('- 知乎', '').trim() : '知乎文章');
 
-    const authorEl = document.querySelector('.AuthorInfo-name .UserLink-link, .AuthorInfo-name, .Post-Header .UserLink-link, .UserLink-link');
-    const authorName = authorEl ? authorEl.innerText.trim() : '知乎专栏作者';
+    const authorEl = targetDoc.querySelector('.AuthorInfo-name .UserLink-link, .AuthorInfo-name, .Post-Header .UserLink-link, .UserLink-link');
+    let authorName = authorEl ? authorEl.innerText.trim() : '知乎专栏作者';
 
-    const badgeEl = document.querySelector('.AuthorInfo-badgeText, .AuthorInfo-detail');
-    const badgeText = badgeEl ? badgeEl.innerText.trim() : '';
+    const badgeEl = targetDoc.querySelector('.AuthorInfo-badgeText, .AuthorInfo-detail');
+    let badgeText = badgeEl ? badgeEl.innerText.trim() : '';
 
-    const voteEl = document.querySelector('.VoteButton-count, .VoteButton--up, .Button--voteUp');
-    const voteCount = voteEl ? voteEl.innerText.replace(/▲|\n|赞同/g, '').trim() || '0' : '0';
+    const voteEl = targetDoc.querySelector('.VoteButton-count, .VoteButton--up, .Button--voteUp');
+    let voteCount = voteEl ? voteEl.innerText.replace(/▲|\n|赞同/g, '').trim() || '0' : '0';
 
     let commentCount = '0';
-    const commentBtns = Array.from(document.querySelectorAll('button, .Button'));
-    const commentBtn = commentBtns.find(b => b.innerText.includes('评论'));
+    const commentBtns = Array.from(targetDoc.querySelectorAll('button, .Button'));
+    const commentBtn = commentBtns.find(b => (b.innerText || b.textContent || '').includes('评论'));
     if (commentBtn) {
-      const match = commentBtn.innerText.match(/\d+/);
+      const match = (commentBtn.innerText || commentBtn.textContent).match(/\d+/);
       if (match) commentCount = match[0];
     }
 
-    const articleEl = document.querySelector('.Post-RichTextContainer, .Post-RichText, .ArticleItem-content, .RichText');
-    const contentText = articleEl ? articleEl.innerText.trim() : '';
-    const contentHtml = articleEl ? articleEl.innerHTML : '';
+    const articleEl = targetDoc.querySelector('.Post-RichTextContainer, .Post-RichText, .ArticleItem-content, .RichText');
+    let contentText = articleEl ? this.cleanContentText(articleEl) : '';
+    let contentHtml = articleEl ? articleEl.innerHTML : '';
 
     let articleId = '';
-    const pathMatch = window.location.pathname.match(/p\/(\d+)/);
+    const currentUrl = url || (typeof window !== 'undefined' ? window.location.pathname : '');
+    const pathMatch = currentUrl.match(/p\/(\d+)/);
     if (pathMatch) articleId = pathMatch[1];
 
-    // 1. Try extracting comments from js-initialData JSON state first
-    let comments = this.extractCommentsFromInitialData();
+    if (!contentText) {
+      const initialDataEl = targetDoc.getElementById('js-initialData');
+      if (initialDataEl && initialDataEl.textContent) {
+        try {
+          const json = JSON.parse(initialDataEl.textContent);
+          const articles = json?.initialState?.entities?.articles || {};
+          const artObj = Object.values(articles)[0] || (articleId ? articles[articleId] : null);
+          if (artObj) {
+            title = artObj.title || title;
+            authorName = artObj.author?.name || authorName;
+            contentText = (artObj.content || '').replace(/<[^>]+>/g, '').trim();
+            voteCount = String(artObj.voteupCount || voteCount);
+            commentCount = String(artObj.commentCount || commentCount);
+          }
+        } catch(e) {}
+      }
+    }
 
-    // 2. Fallback to DOM comments if initialData had no comments
+    let comments = this.extractCommentsFromInitialData(targetDoc);
+
     if (comments.length === 0) {
-      const commentNodes = Array.from(document.querySelectorAll('.NestComment, .CommentItemV2, .CommentItem, [class*="CommentItem"], [class*="NestComment"]'));
+      const commentNodes = Array.from(targetDoc.querySelectorAll('.NestComment, .CommentItemV2, .CommentItem, [class*="CommentItem"], [class*="NestComment"]'));
       const topComments = commentNodes.filter(node => !node.parentElement || !node.parentElement.closest('.NestComment, .CommentItemV2, .CommentItem, [class*="NestComment"], [class*="CommentItem"], [class*="replyList"]'));
 
       topComments.forEach((cNode, cIdx) => {
@@ -224,7 +285,7 @@ window.VSZhihuParser = {
         voteCount: voteCount,
         commentCount: commentCount,
         contentHtml: contentHtml,
-        contentText: contentText,
+        contentText: contentText || title,
         comments: comments
       }]
     };
@@ -266,18 +327,61 @@ window.VSZhihuParser = {
     return '';
   },
 
+  cleanContentText: function(target) {
+    if (!target) return '';
+    
+    if (typeof target === 'string') {
+      return target
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/\.css-[^{]+\{[^}]+\}/g, '')
+        .replace(/\{[^{}]*dynamic-range-limit[^{}]*\}/gi, '')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\n\s*\n/g, '\n')
+        .trim();
+    }
+
+    try {
+      const clone = target.cloneNode(true);
+      clone.querySelectorAll('style, script, svg, [data-uncomfortable], link, meta').forEach(node => node.remove());
+      
+      let text = (clone.innerText || clone.textContent || '').trim();
+      text = text
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/\.css-[^{]+\{[^}]+\}/g, '')
+        .replace(/\{[^{}]*dynamic-range-limit[^{}]*\}/gi, '')
+        .replace(/\n\s*\n/g, '\n')
+        .trim();
+      return text;
+    } catch(e) {
+      return (target.innerText || target.textContent || '').trim();
+    }
+  },
+
+  cleanAuthorName: function(name) {
+    if (!name) return '知乎用户';
+    let clean = String(name)
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/\.css-[^{]+\{[^}]+\}/g, '')
+      .replace(/\{[^}]*\}/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return clean || '知乎用户';
+  },
+
   /**
    * Parse Question Page (`/question/123456`)
    */
-  parseQuestionPage: function() {
-    const titleEl = document.querySelector('h1.QuestionHeader-title, .QuestionHeader-title');
-    const title = titleEl ? titleEl.innerText.trim() : document.title.replace('- 知乎', '').trim();
+  parseQuestionPage: function(doc = (typeof document !== 'undefined' ? document : null), url = '') {
+    const targetDoc = doc || document;
+    const titleEl = targetDoc.querySelector('h1.QuestionHeader-title, .QuestionHeader-title, h1');
+    let title = titleEl ? (titleEl.innerText || titleEl.textContent || '').trim() : (targetDoc.title ? targetDoc.title.replace('- 知乎', '').trim() : '知乎问题');
 
-    const detailEl = document.querySelector('.QuestionHeader-detail .QuestionRichText, .QuestionHeader-detail');
-    const detailText = detailEl ? detailEl.innerText.trim() : '';
+    const detailEl = targetDoc.querySelector('.QuestionHeader-detail .QuestionRichText, .QuestionHeader-detail');
+    let detailText = detailEl ? this.cleanContentText(detailEl) : '';
 
-    // Target ONLY top-level answer cards inside main column, filtering out nested parent/child containers
-    const mainCol = document.querySelector('.Question-mainColumn, .Question-main, .QuestionAnswers-answers, .List') || document;
+    const mainCol = targetDoc.querySelector('.Question-mainColumn, .Question-main, .QuestionAnswers-answers, .List') || targetDoc;
     const rawCards = Array.from(mainCol.querySelectorAll('.List-item, .AnswerCard, .AnswerItem, .ContentItem, [class*="AnswerItem"], [class*="ContentItem"]'))
                           .filter(c => !c.closest('.QuestionHeader'));
     
@@ -289,13 +393,12 @@ window.VSZhihuParser = {
     const seenTexts = new Set();
 
     answerCards.forEach((card) => {
-      // Exclude question header container
       if (card.closest('.QuestionHeader')) return;
 
       const authorEl = card.querySelector('.AuthorInfo-name .UserLink-link, .AuthorInfo-name, .UserLink-link, [itemprop="name"]');
-      const authorName = authorEl ? (authorEl.getAttribute('content') || authorEl.innerText).trim() : '匿名用户';
+      const rawAuthor = authorEl ? (authorEl.getAttribute('content') || authorEl.innerText || authorEl.textContent || '') : '';
+      const authorName = this.cleanAuthorName(rawAuthor);
 
-      // Extract Answer ID with multi-strategy helper
       const answerId = this.extractAnswerId(card);
       
       const badgeEl = card.querySelector('.AuthorInfo-badgeText, .AuthorInfo-detail, .AuthorInfo-badge');
@@ -304,19 +407,17 @@ window.VSZhihuParser = {
       const avatarEl = card.querySelector('.AuthorInfo-avatar, .Avatar, img.UserLink-avatar');
       const avatarSrc = avatarEl ? avatarEl.getAttribute('src') || avatarEl.querySelector('img')?.getAttribute('src') : '';
 
-      // Vote count extraction
       const voteEl = card.querySelector('.VoteButton-count, .VoteButton--up, .Button--voteUp, [aria-label*="赞同"]');
       let voteCount = '0';
       if (voteEl) {
         voteCount = voteEl.innerText.replace(/▲|\n|赞同/g, '').trim() || '0';
       }
 
-      // Comment count extraction & preservation
       let commentCount = card.dataset.commentCount || '0';
       const commentBtns = Array.from(card.querySelectorAll('button, .Button, [role="button"]'));
-      const commentBtn = commentBtns.find(b => b.innerText.includes('评论'));
+      const commentBtn = commentBtns.find(b => (b.innerText || b.textContent || '').includes('评论'));
       if (commentBtn) {
-        const text = commentBtn.innerText.trim();
+        const text = (commentBtn.innerText || commentBtn.textContent).trim();
         const numMatch = text.match(/\d+/);
         if (numMatch) {
           commentCount = numMatch[0];
@@ -326,21 +427,18 @@ window.VSZhihuParser = {
 
       const richTextEl = card.querySelector('.RichText, .CopyrightRichText-richText');
       const contentHtml = richTextEl ? richTextEl.innerHTML : card.innerText;
-      const contentText = richTextEl ? richTextEl.innerText.trim() : '';
+      const contentText = richTextEl ? this.cleanContentText(richTextEl) : this.cleanContentText(card);
 
-      // Skip duplicate answer blocks or empty text
       if (!contentText || seenTexts.has(contentText.substring(0, 100))) {
         return;
       }
       seenTexts.add(contentText.substring(0, 100));
 
-      // Parse comment nodes (search inside card AND globally in portal/modal containers)
       let nestComments = Array.from(card.querySelectorAll('.NestComment, .CommentItemV2, .CommentItem'));
       if (nestComments.length === 0) {
-        nestComments = Array.from(document.querySelectorAll('.Comments-container .NestComment, .CommentListV2 .NestComment, .Comments-container .CommentItemV2, .CommentListV2 .CommentItemV2, [class*="Comments-container"] [class*="CommentItem"], [class*="CommentList"] [class*="CommentItem"]'));
+        nestComments = Array.from(targetDoc.querySelectorAll('.Comments-container .NestComment, .CommentListV2 .NestComment, .Comments-container .CommentItemV2, .CommentListV2 .CommentItemV2, [class*="Comments-container"] [class*="CommentItem"], [class*="CommentList"] [class*="CommentItem"]'));
       }
 
-      // Filter to top-level comment threads (not nested inside NestComment-children)
       const topComments = nestComments.filter(node => !node.closest('.NestComment-children') && !node.closest('[class*="replyList"]'));
       const comments = [];
 
@@ -354,7 +452,6 @@ window.VSZhihuParser = {
         const cLikeEl = cNode.querySelector('.Button--like, .CommentItem-likeCount, [class*="like"]');
         const cLikes = cLikeEl ? cLikeEl.innerText.replace(/[^\d]/g, '').trim() || '0' : '0';
 
-        // Sub-comments (评论的评论)
         const replyNodes = cNode.querySelectorAll('.NestComment-children [class*="CommentItem"], .CommentItem-reply, .CommentItemV2-replyList [class*="CommentItemV2"], [class*="replyList"] [class*="CommentItem"]');
         const replies = [];
 
@@ -407,21 +504,59 @@ window.VSZhihuParser = {
       });
     });
 
+    // Fallback parsing from js-initialData if no answers found
+    if (answers.length === 0) {
+      const initialDataEl = targetDoc.getElementById('js-initialData');
+      if (initialDataEl && initialDataEl.textContent) {
+        try {
+          const json = JSON.parse(initialDataEl.textContent);
+          const state = json?.initialState || json;
+          const questionsMap = state?.entities?.questions || {};
+          const qObj = Object.values(questionsMap)[0];
+          if (qObj && qObj.title) {
+            title = qObj.title;
+            detailText = qObj.detail || detailText;
+          }
+
+          const answersMap = state?.entities?.answers || {};
+          const ansList = Object.values(answersMap);
+          ansList.forEach((ansObj, idx) => {
+            const author = ansObj.author?.name || '知乎用户';
+            const rawContent = ansObj.content || ansObj.excerpt || '';
+            const cText = rawContent.replace(/<[^>]+>/g, '').trim();
+            if (cText) {
+              answers.push({
+                id: idx + 1,
+                answerId: String(ansObj.id || idx + 1),
+                author: author,
+                badge: ansObj.author?.headline || '',
+                voteCount: String(ansObj.voteupCount || 0),
+                commentCount: String(ansObj.commentCount || 0),
+                contentText: cText,
+                comments: []
+              });
+            }
+          });
+        } catch(e) {}
+      }
+    }
+
     let questionId = '';
-    const qMatch = window.location.pathname.match(/question\/(\d+)/);
+    const currentUrl = url || (typeof window !== 'undefined' ? window.location.pathname : '');
+    const qMatch = currentUrl.match(/question\/(\d+)/);
     if (qMatch) {
       questionId = qMatch[1];
     }
 
     let viewAllText = '';
     let viewAllHref = '';
-    const viewAllEl = document.querySelector('.ViewAll, .QuestionMainAction, [class*="ViewAll"], .Question-mainColumn a[href*="/question/"]');
+    const viewAllEl = targetDoc.querySelector('.ViewAll, .QuestionMainAction, [class*="ViewAll"], .Question-mainColumn a[href*="/question/"]');
     if (viewAllEl) {
       viewAllText = viewAllEl.innerText.replace(/\s+/g, ' ').trim();
       viewAllHref = viewAllEl.getAttribute('href') || '';
     }
 
-    if (!viewAllText && (window.location.pathname.includes('/answer/') || questionId)) {
+    if (!viewAllText && (currentUrl.includes('/answer/') || questionId)) {
       viewAllText = '查看全部回答';
     }
     if (!viewAllHref && questionId) {
@@ -433,7 +568,7 @@ window.VSZhihuParser = {
       title: title,
       detail: detailText,
       answers: answers,
-      isSingleAnswer: window.location.pathname.includes('/answer/'),
+      isSingleAnswer: currentUrl.includes('/answer/'),
       questionId: questionId,
       questionUrl: viewAllHref || (questionId ? `/question/${questionId}` : ''),
       viewAllText: viewAllText || '查看全部回答'
@@ -443,12 +578,17 @@ window.VSZhihuParser = {
   /**
    * Parse Feed / Home Page (`/` or `/follow` or `/recommend`)
    */
-  parseFeedPage: function() {
-    const candidateNodes = Array.from(document.querySelectorAll(
+  parseFeedPage: function(doc = (typeof document !== 'undefined' ? document : null)) {
+    const targetDoc = doc || document;
+    const feedList = [];
+    const seenUrls = new Set();
+
+    // 1. DOM extraction with textContent fallback
+    const candidateNodes = Array.from(targetDoc.querySelectorAll(
       '.TopstoryItem, .HotItem, .Topstory-recommend .Card, .Topstory-follow .Card, .TopstoryMain .Card, [class*="TopstoryItem"], [class*="ContentItem"], .Card, section, [data-za-detail-view-path_module]'
     ));
 
-    const links = Array.from(document.querySelectorAll('a[href*="/question/"], a[href*="/p/"], a[href*="/zhuanlan/"]'));
+    const links = Array.from(targetDoc.querySelectorAll('a[href*="/question/"], a[href*="/p/"], a[href*="/zhuanlan/"]'));
     links.forEach(link => {
       const card = link.closest('.Card, .TopstoryItem, [class*="Item"], section, div');
       if (card && !candidateNodes.includes(card)) {
@@ -457,14 +597,12 @@ window.VSZhihuParser = {
     });
 
     const items = candidateNodes.filter(item => !candidateNodes.some(other => other !== item && other.contains(item)));
-    const feedList = [];
-    const seenUrls = new Set();
 
     items.forEach((item) => {
       const titleEl = item.querySelector('.ContentItem-title a, .QuestionItem-title a, h2 a, .HotItem-title, a[href*="/question/"], a[href*="/p/"], a[href*="/zhuanlan/"]');
       if (!titleEl) return;
 
-      const title = titleEl.innerText.trim();
+      const title = (titleEl.innerText || titleEl.textContent || '').trim();
       let href = titleEl.getAttribute('href') || '';
 
       if (!title || title.length < 2) return;
@@ -473,13 +611,14 @@ window.VSZhihuParser = {
       else if (href.startsWith('/')) href = 'https://www.zhihu.com' + href;
 
       const authorEl = item.querySelector('.UserLink-link, .AuthorInfo-name, [itemprop="name"], .AuthorInfo');
-      const author = authorEl ? authorEl.innerText.replace(/\s+/g, ' ').trim() : '知乎推荐';
+      const rawAuthor = authorEl ? (authorEl.innerText || authorEl.textContent || '') : '';
+      const author = authorEl ? this.cleanAuthorName(rawAuthor) : '知乎推荐';
 
-      const excerptEl = item.querySelector('.RichText, .ContentItem-excerpt, .HotItem-excerpt, .CopyrightRichText-richText');
-      const excerpt = excerptEl ? excerptEl.innerText.trim() : '';
+      const excerptEl = item.querySelector('.RichText, .ContentItem-excerpt, .HotItem-excerpt, .CopyrightRichText-richText, .RichContent-inner');
+      const excerpt = excerptEl ? (excerptEl.innerText || excerptEl.textContent || '').trim() : '';
 
       const metricsEl = item.querySelector('.ContentItem-actions, .HotItem-metrics, .ContentItem-meta');
-      const metrics = metricsEl ? metricsEl.innerText.replace(/\s+/g, ' ').trim() : '';
+      const metrics = metricsEl ? (metricsEl.innerText || metricsEl.textContent || '').replace(/\s+/g, ' ').trim() : '';
 
       if (!href || seenUrls.has(href)) {
         return;
@@ -496,11 +635,118 @@ window.VSZhihuParser = {
       });
     });
 
+    // 2. Fallback to js-initialData JSON state if DOM extraction found nothing
+    if (feedList.length === 0) {
+      const initialDataEl = targetDoc.getElementById('js-initialData');
+      if (initialDataEl && initialDataEl.textContent) {
+        try {
+          const json = JSON.parse(initialDataEl.textContent);
+          const state = json?.initialState || json;
+          const feeds = state?.topstory?.recommend?.data ||
+                        state?.topstory?.hotList ||
+                        (state?.entities?.answers ? Object.values(state.entities.answers) : null) ||
+                        (state?.entities?.articles ? Object.values(state.entities.articles) : null);
+
+          if (Array.isArray(feeds)) {
+            feeds.forEach((f, idx) => {
+              const target = f.target || f;
+              const title = target.question?.title || target.title || '';
+              let href = target.url || target.link?.url || '';
+              if (target.question?.id) href = `https://www.zhihu.com/question/${target.question.id}`;
+              if (target.id && !href) {
+                if (target.type === 'answer' || target.question) href = `https://www.zhihu.com/question/${target.question?.id || '0'}/answer/${target.id}`;
+                else if (target.type === 'article') href = `https://zhuanlan.zhihu.com/p/${target.id}`;
+              }
+              if (title && href && !seenUrls.has(href)) {
+                seenUrls.add(href);
+                feedList.push({
+                  id: feedList.length + 1,
+                  title: title,
+                  href: href,
+                  author: target.author?.name || '知乎用户',
+                  excerpt: (target.excerpt || title).replace(/<[^>]+>/g, '')
+                });
+              }
+            });
+          }
+        } catch(e) {}
+      }
+    }
+
+    // 3. Fallback: Parse any title links in targetDoc
+    if (feedList.length === 0) {
+      links.forEach((linkEl) => {
+        const title = (linkEl.innerText || linkEl.textContent || '').trim();
+        let href = linkEl.getAttribute('href') || '';
+        if (title.length >= 4 && href && !seenUrls.has(href)) {
+          if (href.startsWith('//')) href = 'https:' + href;
+          else if (href.startsWith('/')) href = 'https://www.zhihu.com' + href;
+          seenUrls.add(href);
+          feedList.push({
+            id: feedList.length + 1,
+            title: title,
+            href: href,
+            author: '知乎推荐',
+            excerpt: title
+          });
+        }
+      });
+    }
+
     return {
       type: 'feed',
-      title: document.title.replace('- 知乎', '').trim() || '知乎推荐 Feed',
+      title: (targetDoc.title ? targetDoc.title.replace('- 知乎', '').trim() : '') || '知乎推荐 Feed',
       feedList: feedList
     };
+  },
+
+  /**
+   * Parse any Document object or HTML string
+   */
+  parsePage: function(doc = (typeof document !== 'undefined' ? document : null), url = (typeof window !== 'undefined' ? window.location.href : '')) {
+    const pageType = this.getPageType(doc, url);
+    let data = { type: pageType, title: (doc && doc.title) ? doc.title.replace('- 知乎', '').trim() : '知乎文档', answers: [], feedList: [] };
+
+    if (pageType === 'question') {
+      data = this.parseQuestionPage(doc, url);
+    } else if (pageType === 'article') {
+      data = this.parseArticlePage(doc, url);
+    } else if (pageType === 'hot') {
+      data = this.parseHotPage(doc);
+    } else {
+      data = this.parseFeedPage(doc);
+    }
+    return data;
+  },
+
+  /**
+   * Generate filename for tab based on parsed data and URL
+   */
+  getFileName: function(parsedData, url = '') {
+    const targetUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
+    const type = parsedData ? parsedData.type : '';
+
+    if (type === 'question' || targetUrl.includes('/question/')) {
+      const qid = parsedData?.questionId || targetUrl.match(/question\/(\d+)/)?.[1] || 'doc';
+      return `question_${qid}.ts`;
+    }
+    if (type === 'article' || targetUrl.includes('/p/')) {
+      const pid = parsedData?.articleId || targetUrl.match(/p\/(\d+)/)?.[1] || 'doc';
+      return `article_${pid}.ts`;
+    }
+    if (type === 'hot' || targetUrl.includes('/hot')) {
+      return 'hot_rank.ts';
+    }
+    if (targetUrl.includes('/follow')) {
+      return 'following.ts';
+    }
+    if (type === 'search' || targetUrl.includes('/search')) {
+      const qMatch = targetUrl.match(/q=([^&]+)/)?.[1];
+      const qClean = qMatch ? decodeURIComponent(qMatch).replace(/[^a-zA-Z0-9_-]/g, '_') : 'query';
+      return `search_${qClean || 'result'}.json`;
+    }
+
+    return 'recommend.ts';
   },
 
   /**
@@ -545,7 +791,7 @@ window.VSZhihuParser = {
       code += ` * ANSWER #${idx + 1} by @${escapeHtml(ans.author)} ${ans.badge ? '(' + escapeHtml(ans.badge) + ')' : ''}\n`;
       code += ` * Votes: ▲ ${ans.voteCount} | Comments: 💬 ${ans.commentCount}\n`;
       code += ` */</span>\n`;
-      code += `<span class="syn-kw">export const</span> <span class="syn-var">answer_${ans.id}</span>: <span class="syn-type">Answer</span> = {\n`;
+      code += `<span class="syn-kw">export const</span> <span class="syn-var">answer_${idx + 1}</span>: <span class="syn-type">Answer</span> = {\n`;
       code += `  <span class="syn-var">author</span>: <span class="syn-str">"${escapeHtml(ans.author)}"</span>,\n`;
       code += `  <span class="syn-var">voteCount</span>: <span class="syn-num">${ans.voteCount.replace(/,/g, '')}</span>,\n`;
       code += `  <span class="syn-var">getContent</span>: <span class="syn-kw">function</span>(): <span class="syn-type">string</span> {\n`;

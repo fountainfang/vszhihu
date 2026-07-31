@@ -8,12 +8,10 @@ function escapeHtml(str) {
 }
 
 window.VSZhihuUI = {
-  theme: 'dark-plus',
-  codeViewMode: 'code', // 'code' or 'rich'
-  bossKeyActive: false,
-  activeTab: 'main',
+  tabs: [],
+  activeTabId: null,
+
   fetchApi: function(url) {
-    // 1. Convert to relative URL ONLY if origins match, to avoid cross-subdomain 404s (e.g. zhuanlan vs www)
     let fetchUrl = url;
     try {
       const parsedUrl = new URL(url, window.location.href);
@@ -28,18 +26,29 @@ window.VSZhihuUI = {
         return res.json();
       })
       .catch(err => {
-        // 2. Fallback to Service Worker proxy fetch (bypasses CORS & subdomain restrictions)
         return new Promise((resolve, reject) => {
+          let sentMessage = false;
           try {
-            chrome.runtime.sendMessage({ action: 'fetchUrl', url: url }, (res) => {
-              if (chrome.runtime.lastError || !res || !res.success) {
-                reject(new Error(res?.error || chrome.runtime.lastError?.message || 'Fetch failed'));
-              } else {
-                resolve(res.data);
-              }
-            });
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.runtime.sendMessage) {
+              sentMessage = true;
+              chrome.runtime.sendMessage({ action: 'fetchUrl', url: url }, (res) => {
+                if (chrome.runtime.lastError || !res || !res.success) {
+                  reject(new Error(res?.error || chrome.runtime.lastError?.message || 'Fetch failed'));
+                } else {
+                  try {
+                    resolve(typeof res.data === 'string' ? JSON.parse(res.data) : res.data);
+                  } catch(pErr) {
+                    resolve(res.data);
+                  }
+                }
+              });
+            }
           } catch(e) {
-            reject(e);
+            sentMessage = false;
+          }
+
+          if (!sentMessage) {
+            reject(err);
           }
         });
       });
@@ -101,14 +110,125 @@ window.VSZhihuUI = {
     document.body.classList.add('vsc-enabled');
     document.documentElement.setAttribute('data-vsc-theme', this.theme);
 
+    const initialUrl = window.location.href;
+    const initialTitle = this.getFileName(parsedData, initialUrl);
+    const initialCode = window.VSZhihuParser ? window.VSZhihuParser.formatAsTypeScript(parsedData) : '';
+
+    if (!this.tabs || this.tabs.length === 0) {
+      const mainTab = {
+        id: 'tab-main',
+        title: initialTitle,
+        url: initialUrl,
+        type: parsedData.type || 'feed',
+        parsedData: parsedData,
+        formattedCode: initialCode,
+        scrollTop: 0,
+        icon: parsedData.type === 'search' ? 'json' : 'ts',
+        status: 'loaded'
+      };
+      this.tabs = [mainTab];
+      this.activeTabId = 'tab-main';
+    } else {
+      const mainTab = this.tabs.find(t => t.id === 'tab-main' || t.url === initialUrl);
+      if (mainTab) {
+        mainTab.parsedData = parsedData;
+        mainTab.formattedCode = initialCode;
+        mainTab.title = initialTitle;
+      }
+    }
+
+    this.setFavicon();
     this.createBossScreen();
     this.createAppRoot();
     this.bindShortcuts();
+    this.updatePageTitle();
 
-    // Initialize Command Palette
     if (window.VSZhihuCommandPalette) {
       window.VSZhihuCommandPalette.init(this);
     }
+  },
+
+  setFavicon: function(iconUrl) {
+    const faviconUrl = iconUrl || 'https://code.visualstudio.com/assets/favicon.ico';
+    
+    const applyIcon = () => {
+      let links = document.querySelectorAll("link[rel*='icon']");
+      if (links.length > 0) {
+        links.forEach(l => {
+          l.rel = 'shortcut icon';
+          l.type = 'image/png';
+          l.href = faviconUrl;
+        });
+      } else {
+        const link = document.createElement('link');
+        link.rel = 'shortcut icon';
+        link.type = 'image/png';
+        link.href = faviconUrl;
+        const head = document.getElementsByTagName('head')[0] || document.documentElement;
+        if (head) head.appendChild(link);
+      }
+    };
+
+    applyIcon();
+
+    if (!this._faviconObserver && typeof document !== 'undefined' && document.head) {
+      this._faviconObserver = new MutationObserver(() => {
+        const currentLink = document.querySelector("link[rel*='icon']");
+        if (!currentLink || currentLink.getAttribute('href') !== faviconUrl) {
+          applyIcon();
+        }
+      });
+      this._faviconObserver.observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'rel'] });
+    }
+  },
+
+  updatePageTitle: function(filename) {
+    const activeTab = this.tabs?.find(t => t.id === this.activeTabId);
+    let title = filename || activeTab?.title || (this.getFileName ? this.getFileName() : 'recommend.ts');
+    
+    // Ensure no Chinese characters appear in document.title or tab filename
+    if (/[\u4e00-\u9fa5]/.test(title)) {
+      title = (this.getFileName ? this.getFileName(this.parsedData, window.location.href) : 'recommend.ts');
+    }
+
+    const targetTitle = `${title} - Zhihu Workspace - Visual Studio Code`;
+
+    this._targetTitle = targetTitle;
+    document.title = targetTitle;
+
+    if (typeof document !== 'undefined') {
+      const self = this;
+      const lockTitle = () => {
+        if (self._targetTitle && document.title !== self._targetTitle) {
+          document.title = self._targetTitle;
+        }
+      };
+
+      if (!this._titleInterval) {
+        this._titleInterval = setInterval(lockTitle, 300);
+      }
+
+      if (!this._titleObserver) {
+        const titleEl = document.querySelector('title');
+        if (titleEl) {
+          this._titleObserver = new MutationObserver(lockTitle);
+          this._titleObserver.observe(titleEl, { childList: true, characterData: true, subtree: true });
+        }
+        if (document.head) {
+          this._headTitleObserver = new MutationObserver(lockTitle);
+          this._headTitleObserver.observe(document.head, { childList: true, subtree: true });
+        }
+      }
+    }
+  },
+
+  getFileName: function(parsedData, url = '') {
+    if (window.VSZhihuParser && window.VSZhihuParser.getFileName) {
+      return window.VSZhihuParser.getFileName(parsedData || this.parsedData, url || window.location.href);
+    }
+    const title = (parsedData || this.parsedData)?.title || 'index';
+    const cleanTitle = title.replace(/[^\u4e00-\u9fa5a-zA-Z0-9_-]/g, '_').substring(0, 20);
+    return `${cleanTitle || 'zhihu_feed'}.ts`;
   },
 
   createBossScreen: function() {
@@ -178,9 +298,10 @@ window.VSZhihuUI = {
       document.body.appendChild(app);
     }
 
-    const filename = this.getFileName();
-    const formattedCode = window.VSZhihuParser.formatAsTypeScript(this.parsedData);
-    const lineCount = formattedCode.split('\n').length;
+    const activeTab = this.tabs.find(t => t.id === this.activeTabId) || this.tabs[0];
+    const filename = activeTab ? activeTab.title : this.getFileName();
+    const formattedCode = activeTab ? activeTab.formattedCode : (window.VSZhihuParser ? window.VSZhihuParser.formatAsTypeScript(this.parsedData) : '');
+    const lineCount = (formattedCode || '').split('\n').length;
 
     app.innerHTML = `
       <!-- Left Activity Bar -->
@@ -203,7 +324,7 @@ window.VSZhihuUI = {
             <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
           </div>
           <div class="vsc-act-icon" title="Settings / Themes" id="vsc-act-settings">
-            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/></svg>
           </div>
         </div>
       </div>
@@ -217,10 +338,7 @@ window.VSZhihuUI = {
         <div class="vsc-sidebar-content">
           <div class="vsc-tree-section">
             <div class="vsc-tree-title">▼ Open Editors</div>
-            <div class="vsc-tree-item active">
-              <span class="vsc-file-icon ts">TS</span>
-              <span>${filename}</span>
-            </div>
+            <div id="vsc-open-editors-list"></div>
           </div>
 
           <div class="vsc-tree-section">
@@ -252,21 +370,15 @@ window.VSZhihuUI = {
       <!-- Main Editor Area -->
       <div id="vsc-main-editor">
         <!-- Tab Bar -->
-        <div id="vsc-tab-bar">
-          <div class="vsc-tab active">
-            <span class="vsc-file-icon ts">TS</span>
-            <span class="vsc-tab-title">${filename}</span>
-            <span class="vsc-tab-close">×</span>
-          </div>
-        </div>
+        <div id="vsc-tab-bar"></div>
 
         <!-- Breadcrumbs -->
         <div id="vsc-breadcrumbs">
           <span class="vsc-bc-item">zhihu</span>
           <span class="vsc-bc-sep">&gt;</span>
-          <span class="vsc-bc-item">${this.parsedData.type}</span>
+          <span class="vsc-bc-item" id="vsc-bc-type">${activeTab ? (activeTab.type || 'feed') : 'feed'}</span>
           <span class="vsc-bc-sep">&gt;</span>
-          <span class="vsc-bc-item" style="color: var(--vsc-fg); font-weight: 500;">${filename}</span>
+          <span class="vsc-bc-item" id="vsc-bc-filename" style="color: var(--vsc-fg); font-weight: 500;">${filename}</span>
         </div>
 
         <!-- Code View -->
@@ -312,9 +424,14 @@ window.VSZhihuUI = {
       </div>
     `;
 
+    this.renderTabBar();
+    this.renderOpenEditors();
     this.bindClickEvents();
 
-    // Restore scroll position after re-rendering
+    if (this.activeTerminal) {
+      this.openCommentTerminal(this.activeTerminal.answerIdx, this.activeTerminal.answerId);
+    }
+
     const newCodeView = document.getElementById('vsc-code-view');
     if (newCodeView) {
       if (savedScrollTop > 0) {
@@ -324,59 +441,394 @@ window.VSZhihuUI = {
     }
   },
 
+  renderTabBar: function() {
+    const tabBarEl = document.getElementById('vsc-tab-bar');
+    if (!tabBarEl) return;
+
+    if (!this.tabs || this.tabs.length === 0) {
+      tabBarEl.innerHTML = '';
+      return;
+    }
+
+    let html = '';
+    this.tabs.forEach(tab => {
+      const isActive = tab.id === this.activeTabId;
+      const icon = tab.icon || 'ts';
+      html += `
+        <div class="vsc-tab ${isActive ? 'active' : ''}" data-tab-id="${tab.id}" title="${escapeHtml(tab.url || tab.title)}">
+          <span class="vsc-file-icon ${icon}">${icon.toUpperCase()}</span>
+          <span class="vsc-tab-title">${escapeHtml(tab.title)}</span>
+          <span class="vsc-tab-close" data-tab-id="${tab.id}" title="Close Tab">&times;</span>
+        </div>
+      `;
+    });
+
+    tabBarEl.innerHTML = html;
+  },
+
+  renderOpenEditors: function() {
+    const container = document.getElementById('vsc-open-editors-list');
+    if (!container) return;
+
+    if (!this.tabs || this.tabs.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    let html = '';
+    this.tabs.forEach(tab => {
+      const isActive = tab.id === this.activeTabId;
+      const icon = tab.icon || 'ts';
+      html += `
+        <div class="vsc-open-editor-item ${isActive ? 'active' : ''}" data-tab-id="${tab.id}">
+          <span class="vsc-file-icon ${icon}">${icon.toUpperCase()}</span>
+          <span>${escapeHtml(tab.title)}</span>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+  },
+
+  renderActiveTab: function() {
+    const activeTab = this.tabs.find(t => t.id === this.activeTabId) || this.tabs[0];
+    if (!activeTab) return;
+
+    this.parsedData = activeTab.parsedData || { type: 'general', title: activeTab.title, answers: [], feedList: [] };
+
+    // Update browser tab title & favicon
+    this.updatePageTitle(activeTab.title);
+    this.setFavicon();
+
+    // Update breadcrumb
+    const bcType = document.getElementById('vsc-bc-type');
+    const bcFile = document.getElementById('vsc-bc-filename');
+    if (bcType) bcType.innerText = activeTab.type || 'feed';
+    if (bcFile) bcFile.innerText = activeTab.title;
+
+    // Update code view
+    const canvas = document.getElementById('vsc-canvas');
+    const gutter = document.getElementById('vsc-gutter');
+    const codeView = document.getElementById('vsc-code-view');
+
+    const formattedCode = activeTab.formattedCode || '';
+    const lineCount = formattedCode.split('\n').length;
+
+    if (canvas) canvas.innerHTML = formattedCode;
+    if (gutter) {
+      gutter.innerHTML = Array.from({ length: lineCount }, (_, i) => `<div class="vsc-line-num">${i + 1}</div>`).join('');
+    }
+    if (codeView && activeTab.scrollTop > 0) {
+      codeView.scrollTop = activeTab.scrollTop;
+    }
+  },
+
+  switchTab: function(tabId) {
+    const tab = this.tabs.find(t => t.id === tabId);
+    if (!tab) return;
+
+    const cv = document.getElementById('vsc-code-view');
+    const prevActiveTab = this.tabs.find(t => t.id === this.activeTabId);
+    if (prevActiveTab && cv) {
+      prevActiveTab.scrollTop = cv.scrollTop;
+    }
+
+    this.activeTabId = tabId;
+    this.renderTabBar();
+    this.renderOpenEditors();
+    this.renderActiveTab();
+  },
+
+  closeTab: function(tabId) {
+    const index = this.tabs.findIndex(t => t.id === tabId);
+    if (index === -1) return;
+
+    const wasActive = this.activeTabId === tabId;
+    this.tabs.splice(index, 1);
+
+    if (this.tabs.length === 0) {
+      const defaultTab = {
+        id: 'tab-main',
+        title: 'recommend.ts',
+        url: 'https://www.zhihu.com/',
+        type: 'feed',
+        parsedData: { type: 'feed', title: '知乎推荐 Feed', feedList: [] },
+        formattedCode: `<span class="syn-cmt">// No open tabs. Click items in Explorer or links to open.</span>\n`,
+        scrollTop: 0,
+        icon: 'ts',
+        status: 'loaded'
+      };
+      this.tabs.push(defaultTab);
+      this.activeTabId = 'tab-main';
+      this.renderTabBar();
+      this.renderOpenEditors();
+      this.renderActiveTab();
+      return;
+    }
+
+    if (wasActive) {
+      const nextIndex = Math.min(index, this.tabs.length - 1);
+      this.switchTab(this.tabs[nextIndex].id);
+    } else {
+      this.renderTabBar();
+      this.renderOpenEditors();
+    }
+  },
+
+  openInNewTab: function(url, titleHint) {
+    if (!url || url.startsWith('javascript:')) return;
+
+    let fullUrl = url;
+    if (fullUrl.startsWith('//')) fullUrl = 'https:' + fullUrl;
+    else if (fullUrl.startsWith('/')) fullUrl = 'https://www.zhihu.com' + fullUrl;
+
+    const baseUrl = fullUrl.split('#')[0];
+
+    const existingTab = this.tabs.find(t => t.url === fullUrl || t.url === baseUrl);
+    if (existingTab) {
+      this.switchTab(existingTab.id);
+      return;
+    }
+
+    const tabId = 'tab-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    let title = '';
+
+    if (fullUrl.includes('/question/')) {
+      const qid = fullUrl.match(/question\/(\d+)/)?.[1];
+      title = `question_${qid || 'doc'}.ts`;
+    } else if (fullUrl.includes('/p/')) {
+      const pid = fullUrl.match(/p\/(\d+)/)?.[1];
+      title = `article_${pid || 'doc'}.ts`;
+    } else if (fullUrl.includes('/hot')) {
+      title = 'hot_rank.ts';
+    } else if (fullUrl.includes('/follow')) {
+      title = 'following.ts';
+    } else if (fullUrl.includes('/search')) {
+      const qMatch = fullUrl.match(/q=([^&]+)/)?.[1];
+      const qClean = qMatch ? decodeURIComponent(qMatch).replace(/[^a-zA-Z0-9_-]/g, '_') : 'query';
+      title = `search_${qClean || 'result'}.json`;
+    } else {
+      title = 'recommend.ts';
+    }
+
+    const newTab = {
+      id: tabId,
+      title: title,
+      url: fullUrl,
+      type: 'loading',
+      parsedData: { type: 'general', title: title, answers: [], feedList: [] },
+      formattedCode: `<span class="syn-cmt">// ⏳ 正在加载知乎文档: ${escapeHtml(fullUrl)} ...</span>\n`,
+      scrollTop: 0,
+      icon: title.endsWith('.json') ? 'json' : 'ts',
+      status: 'loading'
+    };
+
+    this.tabs.push(newTab);
+    this.switchTab(tabId);
+
+    const self = this;
+    const requestUrl = fullUrl;
+
+    const performFetch = (targetUrl) => {
+      return new Promise((resolve, reject) => {
+        let sentMessage = false;
+        try {
+          if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.runtime.sendMessage) {
+            sentMessage = true;
+            chrome.runtime.sendMessage({ action: 'fetchUrl', url: targetUrl }, (res) => {
+              if (chrome.runtime.lastError || !res || !res.success) {
+                fetch(targetUrl, { credentials: 'include' })
+                  .then(r => r.text())
+                  .then(resolve)
+                  .catch(reject);
+              } else {
+                resolve(res.data);
+              }
+            });
+          }
+        } catch(e) {
+          sentMessage = false;
+        }
+
+        if (!sentMessage) {
+          fetch(targetUrl, { credentials: 'include' })
+            .then(r => r.text())
+            .then(resolve)
+            .catch(reject);
+        }
+      });
+    };
+
+    performFetch(requestUrl)
+      .then(htmlText => {
+        let parsedData = null;
+        let formattedCode = '';
+
+        if (typeof htmlText === 'string') {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(htmlText, 'text/html');
+          if (window.VSZhihuParser) {
+            parsedData = window.VSZhihuParser.parsePage(doc, requestUrl);
+            formattedCode = window.VSZhihuParser.formatAsTypeScript(parsedData);
+          }
+        } else if (typeof htmlText === 'object') {
+          parsedData = htmlText;
+          formattedCode = JSON.stringify(htmlText, null, 2);
+        }
+
+        if (parsedData) {
+          const updatedTitle = window.VSZhihuParser ? window.VSZhihuParser.getFileName(parsedData, requestUrl) : title;
+          newTab.title = updatedTitle;
+          newTab.parsedData = parsedData;
+          newTab.type = parsedData.type || 'general';
+          newTab.formattedCode = formattedCode || `<span class="syn-cmt">// 无法解析该页面内容</span>`;
+          newTab.status = 'loaded';
+
+          if (self.activeTabId === tabId) {
+            self.renderTabBar();
+            self.renderOpenEditors();
+            self.renderActiveTab();
+          }
+        }
+      })
+      .catch(err => {
+        console.error('[VSCode-Zhihu] Fetch tab error:', err);
+        newTab.formattedCode = `<span class="syn-cmt">// ⚠️ 加载失败: ${escapeHtml(err.message || '网络连接或页面解析异常')}\n// 您可以点击原生链接直接访问: <a href="${requestUrl}" target="_blank" class="vsc-code-link">${escapeHtml(requestUrl)}</a></span>`;
+        newTab.status = 'error';
+        if (self.activeTabId === tabId) {
+          self.renderActiveTab();
+        }
+      });
+  },
+
+  fetchMoreAnswers: function(tab) {
+    if (!tab || tab.isFetchingMore) return Promise.resolve();
+
+    const parsed = tab.parsedData;
+    if (!parsed || parsed.type !== 'question') return Promise.resolve();
+
+    let qid = parsed.questionId;
+    if (!qid && tab.url) {
+      qid = tab.url.match(/question\/(\d+)/)?.[1];
+    }
+    if (!qid) return Promise.resolve();
+
+    tab.isFetchingMore = true;
+    const offset = parsed.answers ? parsed.answers.length : 0;
+    const apiUrl = `https://www.zhihu.com/api/v4/questions/${qid}/answers?include=data%5B*%5D.content%2Cexcerpt%2Cvoteup_count%2Ccomment_count%2Cauthor%2Cbadge&limit=10&offset=${offset}`;
+
+    const self = this;
+    return this.fetchApi(apiUrl)
+      .then(json => {
+        tab.isFetchingMore = false;
+        if (!json || !json.data || !Array.isArray(json.data) || json.data.length === 0) {
+          return;
+        }
+
+        const newAnswers = [];
+        json.data.forEach((ans, idx) => {
+          const authorName = window.VSZhihuParser ? window.VSZhihuParser.cleanAuthorName(ans.author?.name || '知乎用户') : (ans.author?.name || '知乎用户');
+          const rawContent = ans.content || ans.excerpt || '';
+          const cText = window.VSZhihuParser ? window.VSZhihuParser.cleanContentText(rawContent) : rawContent.replace(/<[^>]+>/g, '').trim();
+
+          if (!cText || !cText.trim()) return;
+
+          const ansId = String(ans.id || (offset + idx + 1));
+          const badgeText = ans.author?.headline || '';
+          const voteCount = String(ans.voteup_count || 0);
+          const commentCount = String(ans.comment_count || 0);
+
+          if (!parsed.answers.some(existing => String(existing.answerId) === ansId || (existing.contentText && existing.contentText.substring(0, 80) === cText.substring(0, 80)))) {
+            newAnswers.push({
+              id: parsed.answers.length + 1,
+              answerId: ansId,
+              author: authorName,
+              badge: badgeText,
+              voteCount: voteCount,
+              commentCount: commentCount,
+              contentHtml: ans.content || '',
+              contentText: cText,
+              comments: []
+            });
+          }
+        });
+
+        if (newAnswers.length > 0) {
+          parsed.answers.push(...newAnswers);
+          tab.formattedCode = window.VSZhihuParser ? window.VSZhihuParser.formatAsTypeScript(parsed) : tab.formattedCode;
+
+          if (self.activeTabId === tab.id) {
+            const canvas = document.getElementById('vsc-canvas');
+            const gutter = document.getElementById('vsc-gutter');
+            if (canvas) canvas.innerHTML = tab.formattedCode;
+            if (gutter) {
+              const lineCount = tab.formattedCode.split('\n').length;
+              gutter.innerHTML = Array.from({ length: lineCount }, (_, i) => `<div class="vsc-line-num">${i + 1}</div>`).join('');
+            }
+          }
+        }
+      })
+      .catch(err => {
+        tab.isFetchingMore = false;
+        console.error('[VSCode-Zhihu] fetchMoreAnswers error:', err);
+      });
+  },
+
   bindInfiniteScroll: function(codeViewEl) {
     let isLoading = false;
+    const self = this;
+
     codeViewEl.addEventListener('scroll', () => {
       if (codeViewEl.scrollTop + codeViewEl.clientHeight >= codeViewEl.scrollHeight - 600) {
         if (!isLoading) {
           isLoading = true;
 
-          // Incrementally scroll native window to trigger React pagination listeners
-          const currentScroll = window.scrollY || window.pageYOffset || 0;
-          const maxScroll = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 6000);
-          const nextScroll = currentScroll + 1200;
+          const activeTab = self.tabs?.find(t => t.id === self.activeTabId);
+          if (activeTab && activeTab.parsedData && activeTab.parsedData.type === 'question') {
+            self.fetchMoreAnswers(activeTab).finally(() => {
+              setTimeout(() => { isLoading = false; }, 350);
+            });
+          } else {
+            const currentScroll = window.scrollY || window.pageYOffset || 0;
+            const maxScroll = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, 6000);
+            const nextScroll = currentScroll + 1200;
 
-          window.scrollTo(0, Math.min(nextScroll, maxScroll));
+            window.scrollTo(0, Math.min(nextScroll, maxScroll));
 
-          // Dispatch scroll events to all candidate native containers
-          const targets = [
-            window,
-            document,
-            document.documentElement,
-            document.body,
-            document.querySelector('.Question-mainColumn'),
-            document.querySelector('.Question-main'),
-            document.querySelector('.QuestionAnswers-answers'),
-            document.querySelector('.List')
-          ].filter(Boolean);
+            const targets = [
+              window,
+              document,
+              document.documentElement,
+              document.body,
+              document.querySelector('.Question-mainColumn'),
+              document.querySelector('.Question-main'),
+              document.querySelector('.QuestionAnswers-answers'),
+              document.querySelector('.List')
+            ].filter(Boolean);
 
-          targets.forEach(target => {
-            try {
-              target.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
-            } catch(e) {}
-          });
+            targets.forEach(target => {
+              try {
+                target.dispatchEvent(new Event('scroll', { bubbles: true, cancelable: true }));
+              } catch(e) {}
+            });
 
-          setTimeout(() => {
-            isLoading = false;
-          }, 350);
+            setTimeout(() => {
+              isLoading = false;
+            }, 350);
+          }
         }
       }
     });
-  },
-
-  getFileName: function() {
-    const title = this.parsedData.title || 'index';
-    const cleanTitle = title.replace(/[^\u4e00-\u9fa5a-zA-Z0-9_-]/g, '_').substring(0, 20);
-    return `${cleanTitle || 'zhihu_feed'}.ts`;
   },
 
   setTheme: function(themeName) {
     this.theme = themeName;
     document.documentElement.setAttribute('data-vsc-theme', themeName);
     try { localStorage.setItem('vsc_theme', themeName); } catch(e) {}
-    if (chrome.runtime && chrome.runtime.sendMessage) {
-      chrome.runtime.sendMessage({ action: 'saveSetting', key: 'theme', value: themeName });
-    }
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id && chrome.runtime.sendMessage) {
+        chrome.runtime.sendMessage({ action: 'saveSetting', key: 'theme', value: themeName });
+      }
+    } catch(e) {}
   },
 
   toggleBossKey: function() {
@@ -408,7 +860,37 @@ window.VSZhihuUI = {
 
     const self = this;
     document.addEventListener('click', (e) => {
-      // 1. Comment Trigger / Comment Link
+      // 1. Tab Bar Close Button
+      const tabCloseBtn = e.target.closest('.vsc-tab-close');
+      if (tabCloseBtn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const tabId = tabCloseBtn.getAttribute('data-tab-id');
+        if (tabId) self.closeTab(tabId);
+        return;
+      }
+
+      // 2. Tab Bar Item
+      const tabItem = e.target.closest('.vsc-tab');
+      if (tabItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        const tabId = tabItem.getAttribute('data-tab-id');
+        if (tabId) self.switchTab(tabId);
+        return;
+      }
+
+      // 3. Open Editors Item in Sidebar
+      const openEditorItem = e.target.closest('.vsc-open-editor-item');
+      if (openEditorItem) {
+        e.preventDefault();
+        e.stopPropagation();
+        const tabId = openEditorItem.getAttribute('data-tab-id');
+        if (tabId) self.switchTab(tabId);
+        return;
+      }
+
+      // 4. Comment Trigger / Comment Link
       const commentBtn = e.target.closest('.vsc-btn-comment-trigger, .vsc-code-comment-link:not(.vsc-btn-expand-sub)');
       if (commentBtn) {
         e.preventDefault();
@@ -440,7 +922,7 @@ window.VSZhihuUI = {
         self.openCommentTerminal(idx, answerId);
 
         const searchContainer = card || document;
-        const btns = Array.from(searchContainer.querySelectorAll('button, .Button, [role="button"], a[class*="comment"], div[class*="comment"]'));
+        const btns = Array.from(searchContainer.querySelectorAll('button, .Button', '[role="button"]', 'a[class*="comment"]', 'div[class*="comment"]'));
         const nativeCommentBtn = btns.find(b => {
           const txt = (b.innerText || b.textContent || '').trim();
           return txt.includes('评论') || txt.includes('条评论');
@@ -457,7 +939,7 @@ window.VSZhihuUI = {
         return;
       }
 
-      // 2. Expand sub-comments / child replies
+      // 5. Expand sub-comments / child replies
       const expandSubBtn = e.target.closest('.vsc-btn-expand-sub');
       if (expandSubBtn) {
         e.preventDefault();
@@ -510,7 +992,7 @@ window.VSZhihuUI = {
         return;
       }
 
-      // 3. Load more root comments
+      // 6. Load more root comments
       const moreRootBtn = e.target.closest('.vsc-btn-more-root-comments');
       if (moreRootBtn) {
         e.preventDefault();
@@ -597,65 +1079,71 @@ window.VSZhihuUI = {
         return;
       }
 
-      // 4. View All Answers Button
+      // 7. View All Answers Button
       const viewAllBtn = e.target.closest('.vsc-btn-view-all');
       if (viewAllBtn) {
         e.preventDefault();
         e.stopPropagation();
         const url = viewAllBtn.getAttribute('data-question-url') || viewAllBtn.getAttribute('href');
-        const nativeBtn = document.querySelector('.ViewAll, .QuestionMainAction, [class*="ViewAll"]');
-        if (nativeBtn) {
-          try { nativeBtn.click(); } catch(err) {}
-        }
         if (url) {
-          const targetUrl = url.startsWith('http') ? url : `https://www.zhihu.com${url}`;
-          window.location.href = targetUrl;
+          self.openInNewTab(url, 'view_all_answers.ts');
         }
         return;
       }
 
-      // 5. Activity bar search / command palette
+      // 8. Activity bar search / command palette
       if (e.target.closest('#vsc-act-search, #vsc-sb-cmd')) {
         if (window.VSZhihuCommandPalette) window.VSZhihuCommandPalette.open();
         return;
       }
 
-      // 6. Boss key triggers
+      // 9. Boss key triggers
       if (e.target.closest('#vsc-act-boss, #vsc-sb-boss')) {
         self.toggleBossKey();
         return;
       }
 
-      // 7. Sponsor button
+      // 10. Sponsor button
       if (e.target.closest('#vsc-sb-sponsor')) {
         window.open('https://ifdian.net/a/7675a', '_blank');
         return;
       }
 
-      // 8. Navigation items
+      // 11. Sidebar Navigation items
       if (e.target.closest('#vsc-act-hot, #vsc-item-hot')) {
-        window.location.href = 'https://www.zhihu.com/hot';
+        e.preventDefault();
+        e.stopPropagation();
+        self.openInNewTab('https://www.zhihu.com/hot', 'hot_rank.ts');
         return;
       }
 
       if (e.target.closest('#vsc-item-recommend')) {
-        window.location.href = 'https://www.zhihu.com/';
+        e.preventDefault();
+        e.stopPropagation();
+        self.openInNewTab('https://www.zhihu.com/', 'recommend.ts');
         return;
       }
 
       if (e.target.closest('#vsc-item-following')) {
-        window.location.href = 'https://www.zhihu.com/follow';
+        e.preventDefault();
+        e.stopPropagation();
+        self.openInNewTab('https://www.zhihu.com/follow', 'following.ts');
         return;
       }
 
       if (e.target.closest('#vsc-item-search')) {
+        e.preventDefault();
+        e.stopPropagation();
         const query = prompt('Search Zhihu:');
-        if (query) window.location.href = `https://www.zhihu.com/search?type=content&q=${encodeURIComponent(query)}`;
+        if (query) {
+          self.openInNewTab(`https://www.zhihu.com/search?type=content&q=${encodeURIComponent(query)}`, `search_${query}.json`);
+        }
         return;
       }
 
-      // 9. Terminal Panel close / clear
+      // 12. Terminal Panel close / clear
       if (e.target.closest('#vsc-panel-close')) {
+        self.activeTerminal = null;
         document.getElementById('vsc-bottom-panel')?.remove();
         return;
       }
@@ -665,10 +1153,34 @@ window.VSZhihuUI = {
         if (body) body.innerHTML = '';
         return;
       }
+
+      // 13. Intercept internal Zhihu links or code links to open in a built-in new tab page
+      const linkEl = e.target.closest('a, .vsc-code-link');
+      if (linkEl) {
+        const href = linkEl.getAttribute('href') || linkEl.getAttribute('data-href') || linkEl.dataset?.url || '';
+        
+        if (href.startsWith('#')) {
+          const targetEl = document.querySelector(href);
+          if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+
+        if (href && !href.startsWith('javascript:')) {
+          const isZhihu = href.includes('zhihu.com') || href.startsWith('/') || href.startsWith('//');
+          if (isZhihu) {
+            e.preventDefault();
+            e.stopPropagation();
+            const linkText = linkEl.innerText || linkEl.textContent || '';
+            self.openInNewTab(href, linkText);
+            return;
+          }
+        }
+      }
     });
   },
 
   openCommentTerminal: function(answerIdx, answerId) {
+    this.activeTerminal = { answerIdx, answerId };
     let panel = document.getElementById('vsc-bottom-panel');
     const editor = document.getElementById('vsc-main-editor');
     if (!editor) return;
