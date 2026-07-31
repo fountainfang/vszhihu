@@ -48,6 +48,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === 'fetchUrl') {
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(request.url);
+    } catch (e) {
+      sendResponse({ success: false, error: 'Invalid URL' });
+      return true;
+    }
+    if (!parsedUrl.hostname.endsWith('zhihu.com')) {
+      sendResponse({ success: false, error: 'Untrusted origin' });
+      return true;
+    }
     fetch(request.url, {
       headers: {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
