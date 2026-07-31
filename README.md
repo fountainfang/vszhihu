@@ -94,6 +94,13 @@ vszhihu/
 
 ---
 
+## 📈 Star History
+
+<p align="center"> <a href="https://www.star-history.com/#fountainfang/vszhihu&Date"> <img src="https://api.star-history.com/svg?repos=fountainfang/vszhihu&type=Date" alt="Star History Chart" /> </a> </p>
+
+---
+
 ## 📄 开源协议
 
 本项目基于 [MIT License](LICENSE) 协议开源。
+
